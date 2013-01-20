@@ -5,7 +5,7 @@ TIMEOUT = 20
 
 import sys
 import re
-import hangul
+import hangul, hangul2
 
 if __name__ != '__main__':
     import bot # recursive, but only called in the handler
@@ -17,7 +17,7 @@ def say(s):
 class BotHandler(bot.Handler):
     def __init__(self, pipe):
         self.pipe = pipe
-        self.codec2 = hangul.Codec_Hangul2()
+        self.codec2 = hangul2.Codec_AchimHangul2()
         self.codec3 = hangul.Codec_Hangul3()
 
     def __getattr__(self, name):

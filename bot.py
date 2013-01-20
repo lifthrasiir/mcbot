@@ -1,6 +1,7 @@
 #!/usr/env/bin python
 # coding=utf-8
 
+from __future__ import print_function
 import sys
 import re
 import select
@@ -11,7 +12,9 @@ import traceback
 import zmq
 
 if len(sys.argv) < 7:
-    print >>sys.stderr, 'Usage: python %s <host> <port> <nick> <channel> <readsock> <writesock>' % sys.argv[0]
+    print('Usage: python %s <host> <port> <nick> <channel> <readsock> <writesock>' % sys.argv[0], file=sys.stderr)
+    print('  First 4 arguments specifies IRC connection and the last socket path.')
+    print('  Example: irc.ozinger.org 6670 mybot mychannel ipc:///var/run/mcbot/foo', file=sys.stderr)
     raise SystemExit(1)
 
 LINEPARSE = re.compile("^(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)(?P<param>( +[^:][^ ]*)*)(?: +:(?P<message>.*))?$")
@@ -22,7 +25,7 @@ CHANNEL = sys.argv[4]
 
 def send(l, silent=False):
     s.send('%s\r\n' % l.replace('\r','').replace('\n','').replace('\0',''))
-    if not silent: print '>>', l
+    if not silent: print('>>', l)
 
 def halt(msg='그럼 이만!'):
     send('QUIT :%s' % msg);
@@ -180,7 +183,7 @@ def loop(pipe):
             if command == 'ping':
                 send('PONG :%s' % message, silent=True)
             else:
-                print '<<', line
+                print('<<', line)
                 if command == '001': # welcome
                     send('JOIN %s' % CHANNEL)
                 #elif command == 'invite' and len(param) > 0 and message:

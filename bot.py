@@ -65,10 +65,12 @@ def safeexec(to, f, args=(), kwargs={}):
         signal.alarm(0)
 
 
+LIST_FLAG = False
 class Handler(object):
     LOG_REX = re.compile(r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \[([A-Z]+)\] (.*)$')
     IGN_REX = re.compile(r'^(?:\d+ recipes|\d+ achievements|Closing listening thread)$')
     EXC_REX = re.compile(r'^(?:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+: .*|\tat .*)$')
+    LIST_HEADER_REX = re.compile(r'^There are (\d+)/\d+ players online:$')
     LOGIN_REX = re.compile(ur'^([^\[]+)\[[^/]*/(.+?):\d+\] logged in with entity id (\d+) at \((-?\d+\.\d+), (-?\d+\.\d+), (-?\d+\.\d+)\)$')
     LOGOUT_REX = re.compile(ur'^([^ ]+) lost connection: (.*)$')
     PUBMSG_REX = re.compile(ur'^<([^>]+)> (.*)$')
@@ -79,6 +81,7 @@ class Handler(object):
     def on_warning(self, msg): pass
     def on_exception(self, line): pass
 
+    def on_list(self, cur, niclist): pass
     def on_login(self, nick, ip, entityid, (x,y,z)): pass
     def on_logout(self, nick, reason): pass
     def on_pubmsg(self, nick, text): pass
@@ -103,6 +106,15 @@ class Handler(object):
             m = self.SPRIVMSG_REX.search(msg)
             if m:
                 return self.on_sprivmsg(m.group(1), m.group(2)) or self.on_info(msg)
+            global LIST_FLAG
+            m = self.LIST_HEADER_REX.search(msg)
+            if m:
+                LIST_FLAG = m.group(1)
+                return self.on_info(msg)
+            if LIST_FLAG:
+                cur = LIST_FLAG
+                LIST_FLAG = False
+                return self.on_list(cur, msg) or self.on_info(msg)
             return self.on_info(msg)
         elif level == 'WARNING':
             return self.on_warning(msg)

@@ -35,6 +35,13 @@ class BotHandler(bot.Handler):
         print '[EXCEPT]', line
         return True
 
+    def on_list(self, cur, nicklist):
+        if cur == '0':
+            say(u'* 아무도 접속해 있지 않습니다')
+        else:
+            say(u'* %s명이 접속해 있습니다: %s' % (cur, nicklist))
+        return True
+
     def on_login(self, nick, ip, entityid, coord):
         self.tell(nick, u'\247b루리넷 마인크래프트 서버에 오신 것을 환영합니다!')
         self.tell(nick, u'\247bhttp://mc.ruree.net/ 과 irc.ozinger.org #ruree 채널에도 와 보세요.')
@@ -87,6 +94,9 @@ def handle(line):
 
 def msg(channel, source, msg):
     msg = msg.decode('utf-8', 'replace')
+    if msg == '!players':
+        bot.pipe.send('list')
+        return
     nick = getnick(source)
     if not nick or '\001' in msg: return # no CTCP yet
     bot.pipe.say(u'\2476[IRC] <%s>\247e %s' % (nick, msg.replace(u'\247', u'')))

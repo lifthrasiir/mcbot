@@ -76,12 +76,14 @@ class Handler(object):
     PUBMSG_REX = re.compile(ur'^<([^>]+)> (.*)$')
     SPUBMSG_REX = re.compile(ur'^\[Server\] (.*)$')
     SPRIVMSG_REX = re.compile(ur'^You whisper to ([^:]+): (.*)$')
+    DEATH_REX = re.compile(r'^([^\[ ]+) (.+)$')
 
     def on_info(self, msg): pass
     def on_warning(self, msg): pass
     def on_exception(self, line): pass
 
-    def on_list(self, cur, niclist): pass
+    def on_death(self, nick, how): pass
+    def on_list(self, cur, nicklist): pass
     def on_login(self, nick, ip, entityid, (x,y,z)): pass
     def on_logout(self, nick, reason): pass
     def on_pubmsg(self, nick, text): pass
@@ -115,6 +117,9 @@ class Handler(object):
                 cur = LIST_FLAG
                 LIST_FLAG = False
                 return self.on_list(cur, msg) or self.on_info(msg)
+            m = self.DEATH_REX.search(msg)
+            if m:
+                return self.on_death(m.group(1), m.group(2)) or self.on_info(msg)
             return self.on_info(msg)
         elif level == 'WARNING':
             return self.on_warning(msg)
@@ -124,6 +129,8 @@ class Handler(object):
         if m: return self.on_log(m.group(1), m.group(2).decode('utf-8', 'replace'))
         if self.EXC_REX.search(line): return self.on_exception(line)
         if self.IGN_REX.search(line): return True
+
+is_players = False
 
 class Pipe(object):
     def __init__(self, read, write):

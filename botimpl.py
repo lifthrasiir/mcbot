@@ -6,6 +6,7 @@ TIMEOUT = 20
 import sys
 import re
 import hangul, hangul2
+import death
 
 if __name__ != '__main__':
     import bot # recursive, but only called in the handler
@@ -35,11 +36,22 @@ class BotHandler(bot.Handler):
         print '[EXCEPT]', line
         return True
 
+    def on_death(self, nick, why):
+        msg = death.msg_i18n(why)
+        if msg:
+            say(u'** %s%s' % (nick, msg))
+            return True
+        else:
+            return False
+
     def on_list(self, cur, nicklist):
+        if not bot.is_players:
+            return False
         if cur == '0':
             say(u'* 아무도 접속해 있지 않습니다')
         else:
             say(u'* %s명이 접속해 있습니다: %s' % (cur, nicklist))
+        bot.is_players = False
         return True
 
     def on_login(self, nick, ip, entityid, coord):
@@ -95,6 +107,7 @@ def handle(line):
 def msg(channel, source, msg):
     msg = msg.decode('utf-8', 'replace')
     if msg == '!players':
+        bot.is_players = True
         bot.pipe.send('list')
         return
     nick = getnick(source)

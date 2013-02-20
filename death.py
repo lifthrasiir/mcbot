@@ -5,7 +5,7 @@ import re
 deathmsg = {
     '^was squashed by a falling anvil$': u'님이 모루에 깔려 사망하셨습니다.',
     '^was pricked to death$': u'님이 바늘에 찔려 사망하셨습니다.',
-    '^walked into a cactus while trying to escape (.+)$': u'님이 %s로부터의 도망치다 선인장에 찔려 사망하셨습니다.',
+    '^walked into a cactus while trying to escape (.+)$': u'님이 %s로부터 도망치려다 선인장에 찔려 사망하셨습니다.',
     '^was shot by arrow$': u'님이 화살에 맞아 사망하셨습니다.',
     '^drowned$': u'님이 익사하셨습니다.',
     '^blew up$': u'님이 빵 터지셨습니다.',
@@ -42,7 +42,7 @@ deathmsg = {
     '^fell out of the world$': u'님이 세상 밖으로 떨어지셨습니다.',
     '^fell from a high place and fell out of the world$': u'님이 지구를 관통하셨습니다.',
     '^was knocked into the void by (.+)$': u'님이 %s님에 의해 자유를 찾으셨습니다.',
-    '^withered away$': u'님이 위더스럽게 되셨습니다.',
+    '^withered away$': u'님이 위더화 되셨습니다.',
 }
 
 deathmsg_re = {}

@@ -50,6 +50,10 @@ def mcsay(s):
 def escape_for_like(s, esc):
     return s.replace(esc, esc+esc).replace(u'_', esc+u'_').replace(u'%', esc+u'%')
 
+def bold(ismc, s):
+    if ismc: return u'\247l%s\247r\2476' % s
+    else: return u'\002%s\002' % s
+
 def get_user(ismc, nick, create=True):
     col = ('mcid' if ismc else 'ircnick')
     c = DB.execute('select * from users where %s like ? escape ? limit 1;' % col, (escape_for_like(nick, u'|'), u'|'))
@@ -90,8 +94,8 @@ def cmd(ismc, nick, cmd, args):
                 reply(u'%s, 해당하는 사용자가 없습니다.' % nick)
                 return True
 
-        reply(u'사용자 정보: 마인크래프트 \002%s\002' % row['mcid'] +
-              (u' / IRC \002%s\002' % row['ircnick'] if row['ircnick'] else u'') +
+        reply(u'사용자 정보: 마인크래프트 %s' % bold(ismc, row['mcid']) +
+              (u' / IRC %s' % bold(ismc, row['ircnick']) if row['ircnick'] else u'') +
               (u' | 소개: %s' % row['intro'] if row['intro'] else u''))
         return True
 

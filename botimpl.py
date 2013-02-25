@@ -126,24 +126,27 @@ def cmd(ismc, nick, cmd, args):
         return True
 
     if cmd == 'kit':
-        u = get_user(ismc, nick)
-        if not u or u['status'] < STATUS_WHITELISTED:
-            reply(u'%s, !set 명령을 한 번 이상 써야 합니다.' % nick)
-        elif u['status'] == STATUS_KITRECEIVED:
-            reply(u'%s, 이미 기본 아이템을 받았으면 다시 받을 수 없습니다. 필요하다면 관리자를 요청하세요.' % nick)
+        if not ismc:
+            reply(u'%s, 이 명령은 마인크래프트 밖에서는 사용할 수 없습니다.' % nick)
         else:
-            bot.pipe.give(u['mcid'], '256') # iron shovel
-            bot.pipe.give(u['mcid'], '257') # iron pickaxe
-            bot.pipe.give(u['mcid'], '258') # iron axe
-            bot.pipe.give(u['mcid'], '292') # iron hoe
-            bot.pipe.give(u['mcid'], '267') # iron sword
-            bot.pipe.give(u['mcid'], '50', '64') # 64x torch
-            bot.pipe.give(u['mcid'], '297', '64') # 64x bread
-            bot.pipe.give(u['mcid'], '328') # minecart
-            bot.pipe.give(u['mcid'], '355') # bed
-            with transaction():
-                DB.execute('update users set status=? where mcid=?;', (STATUS_KITRECEIVED, u['mcid']))
-            reply(u'%s, 기본 아이템을 보내 드렸습니다. 만약 이상이 있다면 관리자에게 요청해 주세요.' % nick)
+            u = get_user(ismc, nick)
+            if not u or u['status'] < STATUS_WHITELISTED:
+                reply(u'%s, !set 명령을 한 번 이상 써야 합니다.' % nick)
+            elif u['status'] == STATUS_KITRECEIVED:
+                reply(u'%s, 이미 기본 아이템을 받았으면 다시 받을 수 없습니다. 필요하다면 관리자를 요청하세요.' % nick)
+            else:
+                bot.pipe.give(u['mcid'], '256') # iron shovel
+                bot.pipe.give(u['mcid'], '257') # iron pickaxe
+                bot.pipe.give(u['mcid'], '258') # iron axe
+                bot.pipe.give(u['mcid'], '292') # iron hoe
+                bot.pipe.give(u['mcid'], '267') # iron sword
+                bot.pipe.give(u['mcid'], '50', '64') # 64x torch
+                bot.pipe.give(u['mcid'], '297', '64') # 64x bread
+                bot.pipe.give(u['mcid'], '328') # minecart
+                bot.pipe.give(u['mcid'], '355') # bed
+                with transaction():
+                    DB.execute('update users set status=? where mcid=?;', (STATUS_KITRECEIVED, u['mcid']))
+                reply(u'%s, 기본 아이템을 보내 드렸습니다. 만약 이상이 있다면 관리자에게 요청해 주세요.' % nick)
         return True
 
 class BotHandler(bot.Handler):
@@ -188,6 +191,7 @@ class BotHandler(bot.Handler):
     def on_login(self, nick, ip, entityid, coord):
         self.tell(nick, u'\247b루리넷 마인크래프트 서버에 오신 것을 환영합니다!')
         self.tell(nick, u'\247bhttp://mc.ruree.net/ 과 irc.ozinger.org #ruree 채널에도 와 보세요.')
+        self.tell(nick, u'\247b중요 공지: 서버봇이 대규모로 업데이트되었습니다. 아직 안 하신 분께서는 !set intro 명령으로 자기 소개를 추가해 주세요.')
         say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % nick)
 
     def on_logout(self, nick, reason):

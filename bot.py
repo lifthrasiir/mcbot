@@ -33,6 +33,7 @@ def halt(msg='그럼 이만!'):
     pipe.say(u'\2474점검을 위해 봇을 잠시 내립니다.')
     raise SystemExit
 signal.signal(signal.SIGINT, lambda sig, frame: halt())
+signal.signal(signal.SIGTERM, lambda sig, frame: halt())
 
 def say(to, msg):
     send('PRIVMSG %s :%s' % (to, msg))

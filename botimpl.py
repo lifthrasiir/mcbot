@@ -64,6 +64,15 @@ def get_user(ismc, nick, create=True):
         row = {u'mcid': nick, u'ircnick': None, u'status': status, u'intro': None}
     return row
 
+def to_ircnick(mcid):
+    c = DB.execute('select ircnick from users where mcid like ? escape ? limit 1;', (escape_for_like(mcid, u'|'), u'|'))
+    row = c.fetchone()
+    nick = row['ircnick'] if row else None
+    if nick and len(nick) > 1:
+        return nick[:1] + u'·' + nick[1:] # no beep on irc
+    else:
+        return nick
+
 def cmd(ismc, nick, cmd, args):
     reply = mcsay if ismc else say
 
@@ -170,35 +179,34 @@ class BotHandler(bot.Handler):
         print '[EXCEPT]', line
         return True
 
-    def on_death(self, nick, why):
+    def on_death(self, mcid, why):
         msg = death.msg_i18n(why)
         if msg:
-            say(u'** %s%s' % (nick, msg))
+            say(u'** %s%s' % (mcid, msg))
             return True
         else:
             return False
 
-    def on_list(self, cur, nicklist):
+    def on_list(self, cur, mcidlist):
         if not bot.is_players:
             return False
         if cur == '0':
             say(u'* 아무도 접속해 있지 않습니다')
         else:
-            say(u'* %s명이 접속해 있습니다: %s' % (cur, nicklist))
+            say(u'* %s명이 접속해 있습니다: %s' % (cur, mcidlist))
         bot.is_players = False
         return True
 
-    def on_login(self, nick, ip, entityid, coord):
-        self.tell(nick, u'\247b루리넷 마인크래프트 서버에 오신 것을 환영합니다!')
-        self.tell(nick, u'\247bhttp://mc.ruree.net/ 과 irc.ozinger.org #ruree 채널에도 와 보세요.')
-        self.tell(nick, u'\247b중요 공지: 서버봇이 대규모로 업데이트되었습니다. 아직 안 하신 분께서는 !set intro 명령으로 자기 소개를 추가해 주세요.')
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % nick)
+    def on_login(self, mcid, ip, entityid, coord):
+        self.tell(mcid, u'\247b루리넷 마인크래프트 서버에 오신 것을 환영합니다!')
+        self.tell(mcid, u'\247bhttp://mc.ruree.net/ 과 irc.ozinger.org #ruree 채널에도 와 보세요.')
+        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
 
-    def on_logout(self, nick, reason):
-        say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % nick)
+    def on_logout(self, mcid, reason):
+        say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
 
-    def on_pubmsg(self, nick, text):
-        print '[CHAT]', '<%s>' % nick, text
+    def on_pubmsg(self, mcid, text):
+        print '[CHAT]', '<%s>' % mcid, text
 
         parts = text.split('--')
         for i in xrange(1, len(parts), 2):
@@ -213,12 +221,12 @@ class BotHandler(bot.Handler):
             if converted.startswith('!'):
                 args = converted[1:].split()
                 if args:
-                    if cmd(True, nick, args[0], args[1:]): return True
+                    if cmd(True, mcid, args[0], args[1:]): return True
 
             # IRC와 (한글 변환이 이루어졌을 경우) 마인크래프트에 재출력
             if converted != text:
-                self.say(u'\2477<%s>\247r %s' % (nick, converted))
-            say(u'<%s> %s' % (nick, converted))
+                self.say(u'\2477<%s>\247r %s' % (mcid, converted))
+            say(u'<%s> %s' % (to_ircnick(mcid) or mcid, converted))
         return True
 
     def on_spubmsg(self, text):

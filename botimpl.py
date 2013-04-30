@@ -182,7 +182,7 @@ class BotHandler(bot.Handler):
     def on_death(self, mcid, why):
         msg = death.msg_i18n(why)
         if msg:
-            say(u'** %s%s' % (mcid, msg))
+            say(u'** %s%s' % (to_ircnick(mcid) or mcid, msg))
             return True
         else:
             return False
@@ -193,7 +193,9 @@ class BotHandler(bot.Handler):
         if cur == '0':
             say(u'* 아무도 접속해 있지 않습니다')
         else:
-            say(u'* %s명이 접속해 있습니다: %s' % (cur, mcidlist))
+            mcidlist = mcidlist.split(', ')
+            mcidlist = [to_ircnick(mcid) or mcid for mcid in mcidlist] # XXX 비효율적임
+            say(u'* %s명이 접속해 있습니다: %s' % (cur, ', '.join(mcidlist)))
         bot.is_players = False
         return True
 

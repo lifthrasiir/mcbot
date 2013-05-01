@@ -6,7 +6,10 @@ TIMEOUT = 20
 import sys
 import re
 import os
+import time
 import sqlite3
+import urllib
+from xml.etree import cElementTree as ET
 from contextlib import contextmanager
 
 import hangul, hangul2
@@ -39,6 +42,40 @@ def transaction():
         raise 
     else: 
         DB.commit()
+
+class RSSWatcher(object):
+    def __init__(self, url):
+        self.url = url
+        self.prevtitles = self.get_titles()
+
+    def get_titles(self):
+        tree = ET.fromstring(urllib.urlopen(self.url).read())
+        titles = {}
+        for item in tree.findall('./channel/item'):
+            title = item.find('title').text
+            nreplies = None
+            m = re.search(ur'^(.*?) \(([0-9]+)\)$', title) # sanitize for kareha
+            if m:
+                title = m.group(1)
+                nreplies = int(m.group(2))
+            guid = item.find('guid').text
+            link = item.find('link').text
+            titles[guid] = (link, title, nreplies)
+        return titles
+
+    def update(self):
+        titles = self.get_titles()
+        added = []
+        updated = []
+        for guid, (link, title, nreplies) in titles.items():
+            if guid not in self.prevtitles:
+                added.append((link, title, nreplies))
+            else:
+                prevlink, prevtitle, prevnreplies = self.prevtitles[guid]
+                if nreplies != prevnreplies:
+                    updated.append((link, title, (nreplies or 0) - (prevnreplies or 0)))
+        self.prevtitles = titles
+        return added, updated
 
 
 def say(s):
@@ -248,8 +285,29 @@ def getnick(source):
     except Exception:
         return None
 
+RSS = RSSWatcher('http://bbs.mearie.org/mc/index.rss')
+LAST_RSS = time.time()
+def update_rss_if_needed():
+    global LAST_RSS
+    now = time.time()
+    if now - LAST_RSS < 30: return
+    added, updated = RSS.update()
+    LAST_RSS = now
+
+    def sayboth(msg, title, link):
+        say(u'## %s: \002%s\002 @ %s' % (msg, title, link))
+        bot.pipe.say(u'\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
+    for link, title, nreplies in added:
+        sayboth(u'새 글이 올라왔습니다', title, link)
+    for link, title, nnewreplies in updated:
+        repliestext = u'%d개의 ' % nnewreplies if nnewreplies > 1 else u''
+        sayboth(repliestext + u'새 답글이 올라왔습니다', title, link)
+
+def everytime():
+    update_rss_if_needed()
+
 def idle():
-    pass
+    everytime()
 
 def handle(line):
     handler = BotHandler(bot.pipe)
@@ -257,16 +315,22 @@ def handle(line):
     if result is None:
         print '*** unhandled: %s' % line
 
+    everytime()
+
 def msg(channel, source, msg):
     msg = msg.decode('utf-8', 'replace')
+    wascmd = False
     if msg.startswith('!'):
         args = msg[1:].split()
         if args:
-            if cmd(False, getnick(source), args[0], args[1:]): return
+            wascmd = cmd(False, getnick(source), args[0], args[1:])
 
-    nick = getnick(source)
-    if not nick or '\001' in msg: return # no CTCP yet
-    bot.pipe.say(u'\2476[IRC] <%s>\247e %s' % (nick, msg.replace(u'\247', u'')))
+    if not wascmd:
+        nick = getnick(source)
+        if nick and '\001' not in msg: # no CTCP yet
+            bot.pipe.say(u'\2476[IRC] <%s>\247e %s' % (nick, msg.replace(u'\247', u'')))
+
+    everytime()
 
 def line(command, source, param, message):
     if command == 'join':
@@ -275,6 +339,8 @@ def line(command, source, param, message):
     elif command == 'part':
         nick = getnick(source)
         if nick: bot.pipe.say(u'\2476[IRC] %s님이 나가셨습니다.' % nick)
+
+    everytime()
 
 def welcome(channel):
     pass

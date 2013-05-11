@@ -8,7 +8,7 @@ import re
 import os
 import time
 import sqlite3
-import urllib
+import urllib2
 from xml.etree import cElementTree as ET
 from contextlib import contextmanager
 
@@ -49,7 +49,7 @@ class RSSWatcher(object):
         self.prevtitles = self.get_titles()
 
     def get_titles(self):
-        tree = ET.fromstring(urllib.urlopen(self.url).read())
+        tree = ET.fromstring(urllib2.urlopen(self.url, timeout=1).read())
         titles = {}
         for item in tree.findall('./channel/item'):
             title = item.find('title').text
@@ -291,8 +291,15 @@ def update_rss_if_needed():
     global LAST_RSS
     now = time.time()
     if now - LAST_RSS < 30: return
-    added, updated = RSS.update()
-    LAST_RSS = now
+    try:
+        added, updated = RSS.update()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        LAST_RSS = now + 120 # 에러가 났을 경우 딜레이를 좀 더 길게 준다.
+        return
+    else:
+        LAST_RSS = now
 
     def sayboth(msg, title, link):
         say(u'## %s: \002%s\002 @ %s' % (msg, title, link))

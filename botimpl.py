@@ -6,6 +6,7 @@ TIMEOUT = 20
 import sys
 import re
 import os
+import os.path
 import time
 import sqlite3
 import urllib2
@@ -14,6 +15,7 @@ from contextlib import contextmanager
 
 import hangul, hangul2
 import death
+import mcutil
 
 if __name__ != '__main__':
     import bot # recursive, but only called in the handler
@@ -114,7 +116,7 @@ def cmd(ismc, nick, cmd, args):
     reply = mcsay if ismc else say
 
     if cmd == 'help' or cmd == 'commands':
-        reply(u'명령 목록: !commands, !players (!p), !who (!w), !set, !kit')
+        reply(u'명령 목록: !commands, !players (!p), !who (!w), !set, !time (!t), !kit')
         return True
 
     if cmd == 'players' or cmd == 'p':
@@ -169,6 +171,15 @@ def cmd(ismc, nick, cmd, args):
         else:
             reply(u'사용법: !set {ircnick|intro} <값>')
 
+        return True
+
+    if cmd == 'time' or cmd == 't':
+        leveldat = mcutil.parse_level_dat(bot.WORLDPATH)
+        delta = leveldat['*LastUpdatedBefore']
+        # 6000이 실제로는 정오니까 보정이 필요. 그리고 날짜는 1일째부터 시작하므로 그것도 보정.
+        days, timeofday = divmod(leveldat['DayTime'] + int(delta * 20) + 30000, 24000)
+        minutes = timeofday * 1440 / 24000
+        reply(u'%d일째 %02d:%02d (%d초 전 갱신)' % (days, minutes/60, minutes%60, delta))
         return True
 
     if cmd == 'kit':

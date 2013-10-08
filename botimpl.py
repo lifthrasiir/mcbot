@@ -16,6 +16,10 @@ from contextlib import contextmanager
 import hangul, hangul2
 import death
 import mcutil
+try:
+    import mcbot_config as config
+except ImportError:
+    import mcbot_defconfig as config
 
 if __name__ != '__main__':
     import bot # recursive, but only called in the handler
@@ -247,10 +251,10 @@ class BotHandler(bot.Handler):
         bot.is_players = False
         return True
 
-    def on_login(self, mcid, ip, entityid, coord):
-        self.tell(mcid, u'\247b루리넷 마인크래프트 서버에 오신 것을 환영합니다!')
-        self.tell(mcid, u'\247bhttp://mc.ruree.net/ 과 irc.ozinger.org #ruree 채널에도 와 보세요.')
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
+    def on_login(self, nick, ip, entityid, coord):
+        for msg in config.welcome_messages:
+            self.tell(nick, msg)
+        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % nick)
 
     def on_logout(self, mcid, reason):
         say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
@@ -296,18 +300,25 @@ def getnick(source):
     except Exception:
         return None
 
-RSS = RSSWatcher('http://bbs.mearie.org/mc/index.rss')
+if config.rss_watcher:
+    RSS = RSSWatcher(config.rss_watcher['url'])
+else:
+    RSS = None
+
 LAST_RSS = time.time()
 def update_rss_if_needed():
-    global LAST_RSS
+    global RSS, LAST_RSS
+    if RSS is None:
+        return
     now = time.time()
-    if now - LAST_RSS < 30: return
+    interval = config.rss_watcher['check_interval']
+    if now - LAST_RSS < interval: return
     try:
         added, updated = RSS.update()
     except Exception:
         import traceback
         traceback.print_exc()
-        LAST_RSS = now + 120 # 에러가 났을 경우 딜레이를 좀 더 길게 준다.
+        LAST_RSS = now + (interval * 4) # 에러가 났을 경우 딜레이를 좀 더 길게 준다.
         return
     else:
         LAST_RSS = now

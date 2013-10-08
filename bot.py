@@ -157,8 +157,8 @@ class Pipe(object):
         return self._stdout
 
     def send(self, *args):
-        line = b' '.join(arg.encode('utf-8') if isinstance(arg, str) else arg for arg in args)
-        self.stdout.send(line)
+        line = ' '.join(str(arg) if not isinstance(arg, str) else arg for arg in args)
+        self.stdout.send_string(line)
         msg = self.stdout.recv()
         assert msg == b''
 

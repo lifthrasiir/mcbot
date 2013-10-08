@@ -85,7 +85,7 @@ class RSSWatcher(object):
 
 
 def say(s):
-    if s: bot.say(bot.CHANNEL, s.encode('utf-8'))
+    if s: bot.say(bot.CHANNEL, s if isinstance(s, str) else str(s))
 
 def mcsay(s):
     if s: bot.pipe.say(u'\2476%s' % s)

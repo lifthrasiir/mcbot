@@ -24,7 +24,8 @@ NICK = sys.argv[3]
 CHANNEL = sys.argv[4]
 
 def send(l, silent=False):
-    s.send('%s\r\n' % l.replace('\r','').replace('\n','').replace('\0',''))
+    msg = '%s\r\n' % l.replace('\r','').replace('\n','').replace('\0','')
+    s.send(msg.encode('utf8'))
     if not silent: print('>>', l)
 
 def halt(msg='그럼 이만!'):
@@ -49,7 +50,7 @@ def sayerr(to):
 def safeexec(to, f, args=(), kwargs={}):
     def alarm(sig, frame):
         #for i in dir(frame):
-        #    if i.startswith('f_'): print i, repr(getattr(frame,i))[:120]
+        #    if i.startswith('f_'): print(i, repr(getattr(frame,i))[:120])
         raise ExecutionTimedOut('execution timed out')
     try:
         try:
@@ -68,15 +69,15 @@ def safeexec(to, f, args=(), kwargs={}):
 
 LIST_FLAG = False
 class Handler(object):
-    LOG_REX = re.compile(r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \[([A-Z]+)\] (.*)$')
-    IGN_REX = re.compile(r'^(?:\d+ recipes|\d+ achievements|Closing listening thread)$')
-    EXC_REX = re.compile(r'^(?:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+: .*|\tat .*)$')
+    LOG_REX = re.compile(br'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \[([A-Z]+)\] (.*)$')
+    IGN_REX = re.compile(br'^(?:\d+ recipes|\d+ achievements|Closing listening thread)$')
+    EXC_REX = re.compile(br'^(?:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+: .*|\tat .*)$')
     LIST_HEADER_REX = re.compile(r'^There are (\d+)/\d+ players online:$')
-    LOGIN_REX = re.compile(ur'^([^\[]+)\[[^/]*/(.+?):\d+\] logged in with entity id (\d+) at \((-?\d+\.\d+), (-?\d+\.\d+), (-?\d+\.\d+)\)$')
-    LOGOUT_REX = re.compile(ur'^([^ ]+) lost connection: (.*)$')
-    PUBMSG_REX = re.compile(ur'^<([^>]+)> (.*)$')
-    SPUBMSG_REX = re.compile(ur'^\[Server\] (.*)$')
-    SPRIVMSG_REX = re.compile(ur'^You whisper to ([^:]+): (.*)$')
+    LOGIN_REX = re.compile(r'^([^\[]+)\[[^/]*/(.+?):\d+\] logged in with entity id (\d+) at \((-?\d+\.\d+), (-?\d+\.\d+), (-?\d+\.\d+)\)$')
+    LOGOUT_REX = re.compile(r'^([^ ]+) lost connection: (.*)$')
+    PUBMSG_REX = re.compile(r'^<([^>]+)> (.*)$')
+    SPUBMSG_REX = re.compile(r'^\[Server\] (.*)$')
+    SPRIVMSG_REX = re.compile(r'^You whisper to ([^:]+): (.*)$')
     DEATH_REX = re.compile(r'^([^\[ ]+) (.+)$')
 
     def on_info(self, msg): pass
@@ -85,7 +86,7 @@ class Handler(object):
 
     def on_death(self, nick, how): pass
     def on_list(self, cur, nicklist): pass
-    def on_login(self, nick, ip, entityid, (x,y,z)): pass
+    def on_login(self, nick, ip, entityid, coord): pass
     def on_logout(self, nick, reason): pass
     def on_pubmsg(self, nick, text): pass
     def on_spubmsg(self, text): pass
@@ -127,7 +128,7 @@ class Handler(object):
 
     def on_line(self, line):
         m = self.LOG_REX.search(line)
-        if m: return self.on_log(m.group(1), m.group(2).decode('utf-8', 'replace'))
+        if m: return self.on_log(m.group(1).decode('ascii'), m.group(2).decode('utf8', 'replace'))
         if self.EXC_REX.search(line): return self.on_exception(line)
         if self.IGN_REX.search(line): return True
 
@@ -145,7 +146,7 @@ class Pipe(object):
         if not self._stdin:
             self._stdin = self.context.socket(zmq.SUB)
             self._stdin.connect(self.inpath)
-            self._stdin.setsockopt(zmq.SUBSCRIBE, '')
+            self._stdin.setsockopt(zmq.SUBSCRIBE, b'')
         return self._stdin
 
     @property
@@ -156,10 +157,10 @@ class Pipe(object):
         return self._stdout
 
     def send(self, *args):
-        line = ' '.join(arg.encode('utf-8') if isinstance(arg, unicode) else arg for arg in args)
+        line = b' '.join(arg.encode('utf-8') if isinstance(arg, str) else arg for arg in args)
         self.stdout.send(line)
         msg = self.stdout.recv()
-        assert msg == ''
+        assert msg == b''
 
     def recv(self):
         return self.stdin.recv()
@@ -190,12 +191,12 @@ def loop(pipe):
     send('NICK %s' % NICK)
     nexttime = time.time() + botimpl.TICK
     while True:
-        line = ''
-        while not line.endswith('\r\n'):
+        line = b''
+        while not line.endswith(b'\r\n'):
             ch = s.recv(1)
-            if ch == '': break
+            if ch == b'': break
             line += ch
-        line = line.rstrip('\r\n')
+        line = line.rstrip(b'\r\n').decode('utf8')
         m = LINEPARSE.match(line)
         if m:
             prefix = m.group('prefix') or ''

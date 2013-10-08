@@ -9,7 +9,7 @@ import os
 import os.path
 import time
 import sqlite3
-import urllib2
+import urllib.request
 from xml.etree import cElementTree as ET
 from contextlib import contextmanager
 
@@ -55,12 +55,12 @@ class RSSWatcher(object):
         self.prevtitles = self.get_titles()
 
     def get_titles(self):
-        tree = ET.fromstring(urllib2.urlopen(self.url, timeout=1).read())
+        tree = ET.fromstring(urllib.request.urlopen(self.url, timeout=1).read())
         titles = {}
         for item in tree.findall('./channel/item'):
             title = item.find('title').text
             nreplies = None
-            m = re.search(ur'^(.*?) \(([0-9]+)\)$', title) # sanitize for kareha
+            m = re.search(r'^(.*?) \(([0-9]+)\)$', title) # sanitize for kareha
             if m:
                 title = m.group(1)
                 nreplies = int(m.group(2))
@@ -220,15 +220,15 @@ class BotHandler(bot.Handler):
         return getattr(self.pipe, name)
 
     def on_info(self, msg):
-        print '[INFO]', msg
+        print('[INFO]', msg)
         return True
 
     def on_warning(self, msg):
-        print '[WARNING]', msg
+        print('[WARNING]', msg)
         return True
 
     def on_exception(self, line):
-        print '[EXCEPT]', line
+        print('[EXCEPT]', line)
         return True
 
     def on_death(self, mcid, why):
@@ -260,10 +260,10 @@ class BotHandler(bot.Handler):
         say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
 
     def on_pubmsg(self, mcid, text):
-        print '[CHAT]', '<%s>' % mcid, text
+        print('[CHAT]', '<%s>' % mcid, text)
 
         parts = text.split('--')
-        for i in xrange(1, len(parts), 2):
+        for i in range(1, len(parts), 2):
             if parts[i].startswith('-'):
                 parts[i], _ = self.codec3.decode(parts[i][1:])
             else:
@@ -284,11 +284,11 @@ class BotHandler(bot.Handler):
         return True
 
     def on_spubmsg(self, text):
-        print '[CHAT]', '<<', text
+        print('[CHAT]', '<<', text)
         return True
 
     def on_sprivmsg(self, target, text):
-        print '[CHAT]', '%s<<' % target, text
+        print('[CHAT]', '%s<<' % target, text)
         return True
 
 
@@ -342,7 +342,7 @@ def handle(line):
     handler = BotHandler(bot.pipe)
     result = handler.on_line(line)
     if result is None:
-        print '*** unhandled: %s' % line
+        print('*** unhandled: %s' % line)
 
     everytime()
 

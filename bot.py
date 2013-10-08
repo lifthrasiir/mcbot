@@ -20,8 +20,8 @@ if len(sys.argv) < 8:
 LINEPARSE = re.compile("^(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)(?P<param>( +[^:][^ ]*)*)(?: +:(?P<message>.*))?$")
 
 s = socket.create_connection((sys.argv[1], sys.argv[2]))
-NICK = sys.argv[3]
-CHANNEL = sys.argv[4]
+NICK = str(sys.argv[3])
+CHANNEL = str(sys.argv[4])
 
 def send(l, silent=False):
     msg = '%s\r\n' % l.replace('\r','').replace('\n','').replace('\0','')

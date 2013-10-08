@@ -294,8 +294,8 @@ class BotHandler(bot.Handler):
 
 def getnick(source):
     try:
-        nick = source.split('!')[0].decode('utf-8', 'replace')
-        if nick.encode('utf-8') == bot.NICK: return None
+        nick = source.split('!')[0]
+        if nick == bot.NICK: return None
         return nick
     except Exception:
         return None
@@ -347,7 +347,6 @@ def handle(line):
     everytime()
 
 def msg(channel, source, msg):
-    msg = msg.decode('utf-8', 'replace')
     wascmd = False
     if msg.startswith('!'):
         args = msg[1:].split()

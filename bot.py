@@ -196,7 +196,7 @@ def loop(pipe):
             ch = s.recv(1)
             if ch == b'': break
             line += ch
-        line = line.rstrip(b'\r\n').decode('utf8')
+        line = line.rstrip(b'\r\n').decode('utf8', 'replace')
         m = LINEPARSE.match(line)
         if m:
             prefix = m.group('prefix') or ''

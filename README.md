@@ -1,7 +1,7 @@
 mcbot
 =====
 
-**mcbot** connects an IRC channel and a Minecraft server and provides the following useful features:
+**mcbot** connects an IRC channel and a Minecraft server, providing the following useful features:
 
  - Bidirectional mediation of chat messages from/to IRC and Minecraft
  - Hangul input methods using `--`, `---` marks in the chat messages (translates English key strokes into Korean keyboard key strokes)

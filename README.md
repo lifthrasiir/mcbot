@@ -13,13 +13,13 @@ How to run (for Ubuntu/Upstart)
 -------------------------------
 
 1. Install the followings:
- - Python 3.3 or higher (Note: Ubuntu 13.04 already ships Python 3.3) for py3k branch
- - Python 2.7 or higher for master branch
+ - Python 3.3 or higher (Note: Ubuntu 13.04 already ships Python 3.3) for the py3k branch
+ - Python 2.7 or higher for the master branch
  - libzmq-dev
  - pyzmq (use `easy_install`; `pip` does not work currently)
-1. Compile 0proxy.c by `$ gcc 0proxy.c -o 0proxy` and it at the path `{ZMQ}`.
+1. Compile 0proxy.c by `$ gcc 0proxy.c -o 0proxy`.
 1. Copy `mcbot_defconfig.py` to `mcbot_config.py` and modify it as you want. (e.g., login welcome messages and RSS tracker)
-1. Create the following upstart configurations, with modification specific to your environments applied.  The configurations may be either session jobs (upstart 1.7 or higher required) or system jobs.  Please refer the Upstart Cookbook to see [what a session job](http://upstart.ubuntu.com/cookbook/#session-job) is and [how to configure session jobs on a non-GUI environment](http://upstart.ubuntu.com/cookbook/#non-graphical-sessions-ubuntu-specific).
+1. Create the following upstart configurations, with modification specific to your environments applied.  The configurations may be either session jobs (upstart 1.7 or higher required) or system jobs.  Please refer the Upstart Cookbook to see [what a session job is](http://upstart.ubuntu.com/cookbook/#session-job) and [how to configure session jobs on a non-GUI environment](http://upstart.ubuntu.com/cookbook/#non-graphical-sessions-ubuntu-specific).
 
 **~/.init/minecraft.conf**
 ```bash
@@ -31,7 +31,7 @@ stop on runlevel [!2345]
 # modify paths according to your environment
 chdir /home/{USERDIR}/minecraft
 env MCPATH=/home/{USERDIR}/minecraft
-env ZMQ=/home/{USERDIR}/minecraft/bin/0proxy
+env ZMQ=/home/{USERDIR}/minecraft/bin/0proxy  # the path where the 0proxy executable is lcoated.
 console log
 
 pre-start script

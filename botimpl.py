@@ -316,7 +316,7 @@ class BotHandler(bot.Handler):
                     tdiff = now - last_login
                 DB.execute("update users set playtime = playtime + ? where mcid=?;", (tdiff.seconds, mcid))
         if tdiff:
-            say(u'*** %s님이 마인크래프트에서 나가셨습니다. (플레이 시간: %d 초)' % (to_ircnick(mcid) or mcid, tdiff.seconds))
+            say(u'*** %s님이 마인크래프트에서 나가셨습니다. (플레이 시간: %s)' % (to_ircnick(mcid) or mcid, readable_timedelta(tdiff)))
         else:
             say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
 

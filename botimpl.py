@@ -136,7 +136,7 @@ def readable_timedelta(td):
             pieces.append('%s%s' % (period_value, period_name))
     if len(pieces) == 0:
         return '0' + preiods[-1][0]
-    return ', '.join(pieces)
+    return ' '.join(pieces)
 
 def get_user(ismc, nick, create=True):
     col = ('mcid' if ismc else 'ircnick')
@@ -293,12 +293,12 @@ class BotHandler(bot.Handler):
         bot.is_players = False
         return True
 
-    def on_login(self, nick, ip, entityid, coord):
+    def on_login(self, mcid, ip, entityid, coord):
         for msg in config.welcome_messages:
-            self.tell(nick, msg)
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % nick)
+            self.tell(mcid, msg)
+        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % to_ircnick(mcid) or mcid)
         with transaction():
-            DB.execute("update users set last_login=datetime('now') where mcid=?;", (get_user(True, nick)['mcid'],))
+            DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))
 
     def on_logout(self, mcid, reason):
         tdiff = None

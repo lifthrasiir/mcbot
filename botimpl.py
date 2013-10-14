@@ -189,7 +189,7 @@ def cmd(ismc, nick, cmd, args):
 
         reply(u'사용자 정보: 마인크래프트 %s' % bold(ismc, row['mcid']) +
               (u' / IRC %s' % bold(ismc, row['ircnick']) if row['ircnick'] else u'') +
-              (u' / 총 플레이 시간 %s' % bold(readable_timedelta(row['playtime']))) +
+              (u' / 총 플레이 시간 %s' % bold(ismc, readable_timedelta(row['playtime']))) +
               (u' | 소개: %s' % row['intro'] if row['intro'] else u''))
         return True
 

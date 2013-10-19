@@ -11,10 +11,10 @@ import signal
 import traceback
 import zmq
 
-if len(sys.argv) < 7:
-    print('Usage: python %s <host> <port> <nick> <channel> <readsock> <writesock>' % sys.argv[0], file=sys.stderr)
-    print('  First 4 arguments specifies IRC connection and the last socket path.')
-    print('  Example: irc.ozinger.org 6670 mybot mychannel ipc:///var/run/mcbot/foo', file=sys.stderr)
+if len(sys.argv) < 8:
+    print('Usage: python %s <host> <port> <nick> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
+    print('  First 4 arguments specify IRC connection; next 2 arguments specify 0proxy socket paths; the last specifies a path to MC world.')
+    print('  Example: irc.ozinger.org 6670 mybot mychannel ipc:///var/run/mcbot/read ipc:///var/run/mcbot/write /var/run/minecraft/world', file=sys.stderr)
     raise SystemExit(1)
 
 LINEPARSE = re.compile("^(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)(?P<param>( +[^:][^ ]*)*)(?: +:(?P<message>.*))?$")
@@ -170,6 +170,8 @@ class Pipe(object):
 
 pipe = Pipe(read=sys.argv[5], write=sys.argv[6])
 assert pipe.stdin and pipe.stdout
+
+WORLDPATH = sys.argv[7]
 
 
 def update_excepthook(pipe):

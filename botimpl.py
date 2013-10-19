@@ -6,6 +6,7 @@ TIMEOUT = 20
 import sys
 import re
 import os
+import os.path
 import time
 import sqlite3
 import urllib2
@@ -14,6 +15,11 @@ from contextlib import contextmanager
 
 import hangul, hangul2
 import death
+import mcutil
+try:
+    import mcbot_config as config
+except ImportError:
+    import mcbot_defconfig as config
 
 if __name__ != '__main__':
     import bot # recursive, but only called in the handler
@@ -114,7 +120,7 @@ def cmd(ismc, nick, cmd, args):
     reply = mcsay if ismc else say
 
     if cmd == 'help' or cmd == 'commands':
-        reply(u'명령 목록: !commands, !players (!p), !who (!w), !set, !kit')
+        reply(u'명령 목록: !commands, !players (!p), !who (!w), !set, !time (!t), !kit')
         return True
 
     if cmd == 'players' or cmd == 'p':
@@ -169,6 +175,15 @@ def cmd(ismc, nick, cmd, args):
         else:
             reply(u'사용법: !set {ircnick|intro} <값>')
 
+        return True
+
+    if cmd == 'time' or cmd == 't':
+        leveldat = mcutil.parse_level_dat(bot.WORLDPATH)
+        delta = leveldat['*LastUpdatedBefore']
+        # 6000이 실제로는 정오니까 보정이 필요. 그리고 날짜는 1일째부터 시작하므로 그것도 보정.
+        days, timeofday = divmod(leveldat['DayTime'] + int(delta * 20) + 30000, 24000)
+        minutes = timeofday * 1440 / 24000
+        reply(u'%d일째 %02d:%02d (%d초 전 갱신)' % (days, minutes/60, minutes%60, delta))
         return True
 
     if cmd == 'kit':
@@ -236,10 +251,10 @@ class BotHandler(bot.Handler):
         bot.is_players = False
         return True
 
-    def on_login(self, mcid, ip, entityid, coord):
-        self.tell(mcid, u'\247b루리넷 마인크래프트 서버에 오신 것을 환영합니다!')
-        self.tell(mcid, u'\247bhttp://mc.ruree.net/ 과 irc.ozinger.org #ruree 채널에도 와 보세요.')
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
+    def on_login(self, nick, ip, entityid, coord):
+        for msg in config.welcome_messages:
+            self.tell(nick, msg)
+        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % nick)
 
     def on_logout(self, mcid, reason):
         say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
@@ -285,18 +300,25 @@ def getnick(source):
     except Exception:
         return None
 
-RSS = RSSWatcher('http://bbs.mearie.org/mc/index.rss')
+if config.rss_watcher:
+    RSS = RSSWatcher(config.rss_watcher['url'])
+else:
+    RSS = None
+
 LAST_RSS = time.time()
 def update_rss_if_needed():
-    global LAST_RSS
+    global RSS, LAST_RSS
+    if RSS is None:
+        return
     now = time.time()
-    if now - LAST_RSS < 30: return
+    interval = config.rss_watcher['check_interval']
+    if now - LAST_RSS < interval: return
     try:
         added, updated = RSS.update()
     except Exception:
         import traceback
         traceback.print_exc()
-        LAST_RSS = now + 120 # 에러가 났을 경우 딜레이를 좀 더 길게 준다.
+        LAST_RSS = now + (interval * 4) # 에러가 났을 경우 딜레이를 좀 더 길게 준다.
         return
     else:
         LAST_RSS = now

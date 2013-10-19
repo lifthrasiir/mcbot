@@ -1,6 +1,7 @@
 *.pyc
 run.sh
 db
+mcbot_config.py
 
 # vim
 .*.swp

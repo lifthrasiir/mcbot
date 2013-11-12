@@ -69,7 +69,7 @@ def safeexec(to, f, args=(), kwargs={}):
 
 LIST_FLAG = False
 class Handler(object):
-    LOG_REX = re.compile(br'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \[([A-Z]+)\] (.*)$')
+    LOG_REX = re.compile(br'^\[\d\d:\d\d:\d\d\] \[Server thread\/([A-Z]+)\]\: (.*)$') 
     IGN_REX = re.compile(br'^(?:\d+ recipes|\d+ achievements|Closing listening thread)$')
     EXC_REX = re.compile(br'^(?:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+: .*|\tat .*)$')
     LIST_HEADER_REX = re.compile(r'^There are (\d+)/\d+ players online:$')

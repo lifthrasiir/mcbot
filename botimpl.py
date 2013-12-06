@@ -118,12 +118,13 @@ def to_ircnick(mcid):
 
 def cmd(ismc, nick, cmd, args):
     reply = mcsay if ismc else say
+    cmd = cmd.lower()
 
     if cmd == 'help' or cmd == 'commands':
         reply(u'명령 목록: !commands, !players (!p), !who (!w), !set, !time (!t), !kit')
         return True
 
-    if cmd == 'players' or cmd == 'p':
+    if cmd == 'players' or cmd == 'p' or cmd == u'ㅔ':
         if ismc:
             reply(u'%s, 이 명령은 마인크래프트 안에서는 사용할 수 없습니다.' % nick)
         else:
@@ -131,7 +132,7 @@ def cmd(ismc, nick, cmd, args):
             bot.pipe.send('list')
         return True
 
-    if cmd == 'whois' or cmd == 'who' or cmd == 'w':
+    if cmd == 'whois' or cmd == 'who' or cmd == 'w' or cmd == u'ㅈ':
         if len(args) != 1:
             reply(u'사용법: !who <마인크래프트 아이디 또는 IRC 닉>')
             return True
@@ -177,7 +178,7 @@ def cmd(ismc, nick, cmd, args):
 
         return True
 
-    if cmd == 'time' or cmd == 't':
+    if cmd == 'time' or cmd == 't' or cmd == u'ㅅ':
         leveldat = mcutil.parse_level_dat(bot.WORLDPATH)
         delta = leveldat['*LastUpdatedBefore']
         # 6000이 실제로는 정오니까 보정이 필요. 그리고 날짜는 1일째부터 시작하므로 그것도 보정.

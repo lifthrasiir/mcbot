@@ -298,8 +298,8 @@ class BotHandler(bot.Handler):
         return True
 
     def on_login(self, mcid, ip, entityid, coord):
-        for msg_pieces in config.welcome_messages:
-            self.tellraw(mcid, {'text': '', 'extra': msg_pieces})
+        for msg in config.welcome_messages:
+            self.tellraw(mcid, msg)
         say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
         with transaction():
             DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))

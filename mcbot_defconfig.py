@@ -3,10 +3,11 @@
 
 # 플레이어 로그인 시 보여줄 환영 메시지.
 welcome_messages = [
-    u'\u00a7r우리의 마인크래프트 서버에 오신 것을 환영합니다.',
-    u'\u00a7r\u00a7b\u00a7nhttp://example.com\u00a7r 홈페이지와 \u00a7bexample.com #example\u00a7r IRC 채널에도 와보세요.',
-    u'\u00a7r채팅 입력시 \u00a77--\u00a7r을 앞에 붙이면 두벌식, \u00a77---\u00a7r을 앞에 붙이면 세벌식이 적용됩니다. (영타를 한글로 변환)',
-    u'\u00a7r\u00a7e\u00a7n중요 공지\u00a7r\u00a7e: 아직 자기소개를 추가하지 않은 분께서는 \u00a7o!set intro\u00a7r\u00a7e 명령으로 자기 소개를 추가해 주세요.',
+    [{'text': 'example', 'color': 'green'}, {'text': ' 마인크래프트 서버에 오신 것을 환영합니다.'}],
+    [{'text': '유용한 링크: ', 'color': 'gray'}, {'text': '지도 보기', 'color': 'aqua', 'underlined': True, 'clickEvent': {'action': 'open_url', 'value': 'http://example.com/overview/'}, 'hoverEvent': {'action': 'show_text', 'value': 'http://example.com/overview/'}}],
+    [{'text': 'irc.example.com #example', 'color':'white'}, {'text': ' IRC 채널에도 와보세요.', 'color': 'gray'}],
+    [{'text': '채팅 입력시 ', 'color': 'gray'}, {'text': '--', 'color':'gold'}, {'text': '을 앞에 붙이면 두벌식, ', 'color': 'gray'}, {'text': '---', 'color':'gold'}, {'text': '을 앞에 붙이면 세벌식이 적용됩니다. (영타를 한글로 변환)', 'color': 'gray'}],
+    [{'text': '중요 공지: ', 'color': 'red', 'bold': True}, {'text': '아직 자기소개를 추가하지 않은 분께서는 ', 'color': 'gray'}, {'text': '!set intro', 'color': 'white'}, {'text': ' 명령으로 자기 소개를 추가해 주세요!', 'color': 'gray'}],
 ]
 
 # 게시판 등이 있을 경우 사용할 RSS 모니터링 옵션.

@@ -107,7 +107,11 @@ def say(s):
     if s: bot.say(bot.CHANNEL, s if isinstance(s, str) else str(s))
 
 def mcsay(s):
-    if s: bot.pipe.say(u'\2476%s' % s)
+    if s:
+        if isinstance(s, dict):
+            bot.pipe.tellraw("@a", s)
+        else:
+            bot.pipe.tellraw("@a", {"text": "", "extra": [{"text": s}]})
 
 def escape_for_like(s, esc):
     return s.replace(esc, esc+esc).replace(u'_', esc+u'_').replace(u'%', esc+u'%')
@@ -294,9 +298,9 @@ class BotHandler(bot.Handler):
         return True
 
     def on_login(self, mcid, ip, entityid, coord):
-        for msg in config.welcome_messages:
-            self.tell(mcid, msg)
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % to_ircnick(mcid) or mcid)
+        for msg_pieces in config.welcome_messages:
+            self.tellraw(mcid, {'text': '', 'extra': msg_pieces})
+        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
         with transaction():
             DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))
 
@@ -340,7 +344,10 @@ class BotHandler(bot.Handler):
 
             # IRC와 (한글 변환이 이루어졌을 경우) 마인크래프트에 재출력
             if converted != text:
-                self.say(u'\2477<%s>\247r %s' % (mcid, converted))
+                self.tellraw('@a', {'text': '', 'extra': [
+                    {'text': u'<%s> ' % mcid, 'color': 'gold'},
+                    {'text': converted}
+                ]})
             say(u'<%s> %s' % (to_ircnick(mcid) or mcid, converted))
         return True
 
@@ -417,17 +424,24 @@ def msg(channel, source, msg):
     if not wascmd:
         nick = getnick(source)
         if nick and '\001' not in msg: # no CTCP yet
-            bot.pipe.say(u'\2476[IRC] <%s>\247e %s' % (nick, msg.replace(u'\247', u'')))
+            bot.pipe.tellraw('@a', {'text': '', 'extra': [
+                {'text': '[IRC] ', 'color': 'gold'},
+                {'text': '<%s> %s' % (nick, msg.replace(u'\247', u'')), 'color': 'white'}
+            ]})
 
     everytime()
 
 def line(command, source, param, message):
     if command == 'join':
         nick = getnick(source)
-        if nick: bot.pipe.say(u'\2476[IRC] %s님이 입장하셨습니다.' % nick)
+        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+            {'text': '[IRC] %s님이 입장하셨습니다.' % nick, 'color': 'gold'}
+        ]})
     elif command == 'part':
         nick = getnick(source)
-        if nick: bot.pipe.say(u'\2476[IRC] %s님이 나가셨습니다.' % nick)
+        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+            {'text': '[IRC] %s님이 나가셨습니다.' % nick, 'color': 'gold'}
+        ]})
 
     everytime()
 

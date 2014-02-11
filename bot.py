@@ -6,6 +6,7 @@ import sys
 import re
 import select
 import socket
+import json
 import time
 import signal
 import traceback
@@ -31,7 +32,9 @@ def send(l, silent=False):
 def halt(msg='그럼 이만!'):
     send('QUIT :%s' % msg);
     s.close()
-    pipe.say(u'\2474점검을 위해 봇을 잠시 내립니다.')
+    pipe.tellraw('@a', {'text': '', 'extra': [
+        {'text': '[mcbot] 점검을 위해 봇을 잠시 내립니다.', 'color': 'red'},
+    ]})
     raise SystemExit
 signal.signal(signal.SIGINT, lambda sig, frame: halt())
 signal.signal(signal.SIGTERM, lambda sig, frame: halt())
@@ -157,7 +160,14 @@ class Pipe(object):
         return self._stdout
 
     def send(self, *args):
-        line = ' '.join(str(arg) if not isinstance(arg, str) else arg for arg in args)
+        def conv2str(a):
+            if isinstance(a, dict) or isinstance(a, list): # for raw JSON messages
+                return json.dumps(a)
+            elif isinstance(a, str):
+                return a
+            else:
+                return str(a)
+        line = ' '.join(conv2str(arg) for arg in args)
         self.stdout.send_string(line)
         msg = self.stdout.recv()
         assert msg == b''
@@ -178,7 +188,9 @@ WORLDPATH = sys.argv[7]
 def update_excepthook(pipe):
     origexcepthook = sys.excepthook
     def excepthook(ty, exc, tb):
-        pipe.say(u'\2474봇 종료: %s %s' % (ty.__name__, str(exc)[:100]))
+        pipe.tellraw('@a', {'text': '', 'extra': [
+            {'text': '[mcbot] 봇 종료: %s %s' % (ty.__name__, str(exc)[:100]), 'color': 'red'},
+        ]})
         return origexcepthook(ty, exc, tb)
     sys.excepthook = excepthook
 

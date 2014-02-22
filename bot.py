@@ -12,8 +12,8 @@ import signal
 import traceback
 import zmq
 
-if len(sys.argv) < 8:
-    print('Usage: python %s <host> <port> <nick> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
+if len(sys.argv) < 9:
+    print('Usage: python %s <host> <port> <nick> <password> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
     print('  First 4 arguments specify IRC connection; next 2 arguments specify 0proxy socket paths; the last specifies a path to MC world.')
     print('  Example: irc.ozinger.org 6670 mybot mychannel ipc:///var/run/mcbot/read ipc:///var/run/mcbot/write /var/run/minecraft/world', file=sys.stderr)
     raise SystemExit(1)
@@ -22,7 +22,8 @@ LINEPARSE = re.compile("^(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)(?P<param>( +[
 
 s = socket.create_connection((sys.argv[1], sys.argv[2]))
 NICK = str(sys.argv[3])
-CHANNEL = str(sys.argv[4])
+PASSWORD = str(sys.argv[4])
+CHANNEL = str(sys.argv[5])
 
 def send(l, silent=False):
     msg = '%s\r\n' % l.replace('\r','').replace('\n','').replace('\0','')
@@ -179,10 +180,10 @@ class Pipe(object):
         def wrapper(*args): return self.send(name, *args)
         return wrapper
 
-pipe = Pipe(read=sys.argv[5], write=sys.argv[6])
+pipe = Pipe(read=sys.argv[6], write=sys.argv[7])
 assert pipe.stdin and pipe.stdout
 
-WORLDPATH = sys.argv[7]
+WORLDPATH = sys.argv[8]
 
 
 def update_excepthook(pipe):
@@ -199,7 +200,9 @@ def loop(pipe):
     poller.register(pipe.stdin, zmq.POLLIN)
     poller.register(s, zmq.POLLIN)
 
-    send('USER kaede kaede ruree.net :Furutani Kaede')
+    if PASSWORD:
+        send('PASS %s' % PASSWORD)
+    send('USER mcsparcs mcsparcs ruree.net :Furutani Kaede')
     send('NICK %s' % NICK)
     nexttime = time.time() + botimpl.TICK
     while True:

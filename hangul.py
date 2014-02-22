@@ -30,20 +30,20 @@ class UnicodeHangulError(Exception):
     
     __str__ = __repr__
 
-Null = u''
+Null = ''
 
 class Jaeum(object):
 
-    Codes = (u'\u3131', u'\u3132', u'\u3133', u'\u3134', u'\u3135', u'\u3136',
-            #    G         GG          GS         N          NJ         NH
-             u'\u3137', u'\u3138', u'\u3139', u'\u313a', u'\u313b', u'\u313c',
-            #    D         DD          L          LG         LM         LB
-             u'\u313d', u'\u313e', u'\u313f', u'\u3140', u'\u3141', u'\u3142',
-            #    LS        LT          LP         LH         M          B
-             u'\u3143', u'\u3144', u'\u3145', u'\u3146', u'\u3147', u'\u3148',
-            #    BB        BS          S          SS         NG         J
-             u'\u3149', u'\u314a', u'\u314b', u'\u314c', u'\u314d', u'\u314e')
-            #    JJ        C           K          T          P          H
+    Codes = ('\u3131', '\u3132', '\u3133', '\u3134', '\u3135', '\u3136',
+            #   G        GG         GS        N         NJ        NH
+             '\u3137', '\u3138', '\u3139', '\u313a', '\u313b', '\u313c',
+            #   D        DD         L         LG        LM        LB
+             '\u313d', '\u313e', '\u313f', '\u3140', '\u3141', '\u3142',
+            #   LS       LT         LP        LH        M         B
+             '\u3143', '\u3144', '\u3145', '\u3146', '\u3147', '\u3148',
+            #   BB       BS         S         SS        NG        J
+             '\u3149', '\u314a', '\u314b', '\u314c', '\u314d', '\u314e')
+            #   JJ       C          K         T         P         H
     Width = len(Codes)
     G, GG, GS, N, NJ, NH, D, DD, L, LG, LM, LB, LS, LT, LP, LH, M, B, \
     BB, BS, S, SS, NG, J, JJ, C, K, T, P, H = Codes
@@ -60,14 +60,14 @@ class Jaeum(object):
 
 class Moeum(object):
 
-    Codes = (u'\u314f', u'\u3150', u'\u3151', u'\u3152', u'\u3153', u'\u3154',
-            #    A          AE        YA         YAE         EO         E
-             u'\u3155', u'\u3156', u'\u3157', u'\u3158', u'\u3159', u'\u315a',
-            #    YEO        YE        O          WA          WAE        OE
-             u'\u315b', u'\u315c', u'\u315d', u'\u315e', u'\u315f', u'\u3160',
-            #    YO         U         WEO        WE          WI         YU
-             u'\u3161', u'\u3162', u'\u3163')
-            #    EU         YI        I
+    Codes = ('\u314f', '\u3150', '\u3151', '\u3152', '\u3153', '\u3154',
+            #   A         AE       YA        YAE        EO        E
+             '\u3155', '\u3156', '\u3157', '\u3158', '\u3159', '\u315a',
+            #   YEO       YE       O         WA         WAE       OE
+             '\u315b', '\u315c', '\u315d', '\u315e', '\u315f', '\u3160',
+            #   YO        U        WEO       WE         WI        YU
+             '\u3161', '\u3162', '\u3163')
+            #   EU        YI       I
     Width = len(Codes)
     A, AE, YA, YAE, EO, E, YEO, YE, O, WA, WAE, OE, YO, \
     U, WEO, WE, WI, YU, EU, YI, I = Codes
@@ -88,15 +88,15 @@ for name, code in list(Jaeum.__dict__.items()) + list(Moeum.__dict__.items()):
 del name, code
 
 # Unicode Hangul Syllables Characteristics
-ZONE = (u'\uAC00', u'\uD7A3')
+ZONE = ('\uAC00', '\uD7A3')
 NCHOSEONG  = len(Choseong)
 NJUNGSEONG = len(Jungseong)
 NJONGSEONG = len(Jongseong)
-JBASE_CHOSEONG  = u'\u1100'
-JBASE_JUNGSEONG = u'\u1161'
-JBASE_JONGSEONG = u'\u11A8'
-CHOSEONG_FILLER = u'\u115F'
-JUNGSEONG_FILLER = u'\u1160'
+JBASE_CHOSEONG  = '\u1100'
+JBASE_JUNGSEONG = '\u1161'
+JBASE_JONGSEONG = '\u11A8'
+CHOSEONG_FILLER = '\u115F'
+JUNGSEONG_FILLER = '\u1160'
 
 _ishangul = (
     lambda code:
@@ -107,21 +107,21 @@ _ishangul = (
 
 # Alternative Suffixes : do not use outside
 ALT_SUFFIXES = {
-    u'\uc744': (u'\ub97c', u'\uc744'), # reul, eul
-    u'\ub97c': (u'\ub97c', u'\uc744'), # reul, eul
-    u'\uc740': (u'\ub294', u'\uc740'), # neun, eun
-    u'\ub294': (u'\ub294', u'\uc740'), # neun, eun
-    u'\uc774': (u'\uac00', u'\uc774'), # yi, ga
-    u'\uac00': (u'\uac00', u'\uc774'), # yi, ga
-    u'\uc640': (u'\uc640', u'\uacfc'), # wa, gwa
-    u'\uacfc': (u'\uc640', u'\uacfc'), # wa, gwa
+    '\uc744': ('\ub97c', '\uc744'), # reul, eul
+    '\ub97c': ('\ub97c', '\uc744'), # reul, eul
+    '\uc740': ('\ub294', '\uc740'), # neun, eun
+    '\ub294': ('\ub294', '\uc740'), # neun, eun
+    '\uc774': ('\uac00', '\uc774'), # yi, ga
+    '\uac00': ('\uac00', '\uc774'), # yi, ga
+    '\uc640': ('\uc640', '\uacfc'), # wa, gwa
+    '\uacfc': ('\uc640', '\uacfc'), # wa, gwa
 }
 
 # Ida-Varitaion Suffixes : do not use outside
 IDA_SUFFIXES = {
-    u'(\uc774)': (u'', u'\uc774'),     # (yi)da
-    u'(\uc785)': (17, u'\uc785'),      # (ip)nida
-    u'(\uc778)': (4, u'\uc778'),       # (in)-
+    '(\uc774)': ('', '\uc774'),     # (yi)da
+    '(\uc785)': (17, '\uc785'),      # (ip)nida
+    '(\uc778)': (4, '\uc778'),       # (in)-
 }
 
 def isJaeum(u):
@@ -187,11 +187,11 @@ def conjoin(s):
 
     while ncur < len(s):
         c = s[ncur]
-        if JBASE_CHOSEONG <= c <= u'\u1112' or c == CHOSEONG_FILLER: # starts with choseong
-            if len(s) > ncur+1 and JUNGSEONG_FILLER <= s[ncur+1] <= u'\u1175':
+        if JBASE_CHOSEONG <= c <= '\u1112' or c == CHOSEONG_FILLER: # starts with choseong
+            if len(s) > ncur+1 and JUNGSEONG_FILLER <= s[ncur+1] <= '\u1175':
                 cho = Choseong[ord(c) - ord(JBASE_CHOSEONG)]
                 jung = Jungseong[ord(s[ncur+1]) - ord(JBASE_JUNGSEONG)]
-                if len(s) > ncur+2 and JBASE_JONGSEONG <= s[ncur+2] <= u'\u11C2':
+                if len(s) > ncur+2 and JBASE_JONGSEONG <= s[ncur+2] <= '\u11C2':
                     jong = Jongseong[ord(s[ncur+2]) - ord(JBASE_JONGSEONG) + 1]
                     ncur += 2
                 else:
@@ -200,13 +200,13 @@ def conjoin(s):
                 obuff.append(join([cho, jung, jong]))
             else:
                 obuff.append(join([Choseong[ord(c) - ord(JBASE_CHOSEONG)], Null, Null]))
-        elif JBASE_JUNGSEONG <= c <= u'\u1175':
+        elif JBASE_JUNGSEONG <= c <= '\u1175':
             obuff.append(join([Null, Jungseong[ord(c) - ord(JBASE_JUNGSEONG)], Null]))
         else:
             obuff.append(c)
         ncur += 1
     
-    return u''.join(obuff)
+    return ''.join(obuff)
 
 def disjoint(s):
     obuff = []
@@ -227,14 +227,14 @@ def disjoint(s):
                 obuff.append( unichr(ord(JBASE_JONGSEONG) + Jongseong.index(jong) - 1) )
         else:
             obuff.append(c)
-    return u''.join(obuff)
+    return ''.join(obuff)
 
 def _has_final(c):
     # for internal use only
-    if u'\uac00' <= c <= u'\ud7a3': # hangul
+    if '\uac00' <= c <= '\ud7a3': # hangul
         return 1, (ord(c) - 0xac00) % 28 > 0
     else:
-        return 0, c in u'013678.bklmnptLMNRZ'
+        return 0, c in '013678.bklmnptLMNRZ'
 
 def format(fmtstr, *args, **kwargs):
     if kwargs:
@@ -244,7 +244,7 @@ def format(fmtstr, *args, **kwargs):
 
     obuff = []
     ncur = escape = fmtinpth = 0
-    ofmt = fmt = u''
+    ofmt = fmt = ''
 
     while ncur < len(fmtstr):
         c = fmtstr[ncur]
@@ -252,24 +252,24 @@ def format(fmtstr, *args, **kwargs):
         if escape:
             obuff.append(c)
             escape = 0
-            ofmt   = u''
-        elif c == u'\\':
+            ofmt   = ''
+        elif c == '\\':
             escape = 1
         elif fmt:
             fmt += c
             if not fmtinpth and c.isalpha():
                 ofmt = fmt % argget()
                 obuff.append(ofmt)
-                fmt = u''
-            elif fmtinpth and c == u')':
+                fmt = ''
+            elif fmtinpth and c == ')':
                 fmtinpth = 0
-            elif c == u'(':
+            elif c == '(':
                 fmtinpth = 1
-            elif c == u'%':
-                obuff.append(u'%')
-        elif c == u'%':
+            elif c == '%':
+                obuff.append('%')
+        elif c == '%':
             fmt  += c
-            ofmt = u''
+            ofmt = ''
         else:
             if ofmt and ALT_SUFFIXES.has_key(c):
                 obuff.append(ALT_SUFFIXES[c][
@@ -290,11 +290,11 @@ def format(fmtstr, *args, **kwargs):
             else:
                 obuff.append(c)
     
-            ofmt = u''
+            ofmt = ''
 
         ncur += 1
     
-    return u''.join(obuff)
+    return ''.join(obuff)
 
 
 #
@@ -338,7 +338,7 @@ _2bul_codekeymap = {
     Moeum.WI:'nl',  Moeum.YU:'b',   Moeum.EU: 'm',  Moeum.YI: 'ml',
     Moeum.I: 'l',
 
-    u'': '',
+    '': '',
 }
 
 _2bul_keycodemap = {}
@@ -365,9 +365,9 @@ class Automata_Hangul2(object):
         self.clearcomp()
 
     def clearcomp(self):
-        self.chosung = u''
-        self.jungsung = u''
-        self.jongsung = u''
+        self.chosung = ''
+        self.jungsung = ''
+        self.jongsung = ''
 
     def clear(self):
         self.buff = ['']
@@ -382,18 +382,18 @@ class Automata_Hangul2(object):
         map(self.feed, s)
         self.finalize()
 
-        return u''.join(self.buff)
+        return ''.join(self.buff)
     
     def finalize(self):
         if self.chosung or self.jungsung or self.jongsung:
             self.pushcomp()
         if self.word_raw or self.word_comp:
             if self.word_valid:
-                rjoi = u''.join(self.word_comp)
+                rjoi = ''.join(self.word_comp)
                 r = 0
             else:
                 self.word_valid = 1
-                rjoi = u''.join(self.word_raw)
+                rjoi = ''.join(self.word_raw)
                 r = 1
 
             self.word_raw, self.word_comp = [], []
@@ -452,7 +452,7 @@ class Automata_Hangul2(object):
                         self.jungsung = code
                     else:
                         njong = self.jongsung
-                        self.jongsung = u''
+                        self.jongsung = ''
                         self.pushcomp()
                         self.chosung = njong
                         self.jungsung = code
@@ -472,7 +472,7 @@ class Codec_Hangul2(codecs.Codec):
 
         r = []
         for c in data:
-            if c <= u'\u0080':
+            if c <= '\u0080':
                 r.append(c.encode('ascii'))
             elif not ishangul(c):
                 r.append(c.encode(self.BASECODEC, errors=errors))
@@ -539,7 +539,7 @@ _3bul_codekeymap = [{
     Jaeum.NG:'j', 
     Jaeum.J: 'l',   Jaeum.JJ:'ll',   Jaeum.C:  'o',  Jaeum.K:  '0',
     Jaeum.T: '\'',  Jaeum.P: 'p',    Jaeum.H:  'm',
-    u'': '',
+    '': '',
 }, {
     Moeum.A: 'f',   Moeum.AE:'r',   Moeum.YA: '6',  Moeum.YAE:'G',
     Moeum.EO:'t',   Moeum.E: 'c',   Moeum.YEO:'e',  Moeum.YE: '7',
@@ -547,7 +547,7 @@ _3bul_codekeymap = [{
     Moeum.YO:'4',   Moeum.U: 'b',   Moeum.WEO:'9t', Moeum.WE: '9c',
     Moeum.WI:'9d',  Moeum.YU:'5',   Moeum.EU: 'g',  Moeum.YI: '8',
     Moeum.I: 'd',
-    u'': '',
+    '': '',
 }, {
     Jaeum.G: 'x',   Jaeum.GG: '!',  Jaeum.GS: 'V',
     Jaeum.N: 's',   Jaeum.NJ: 'E',  Jaeum.NH: 'S',
@@ -561,7 +561,7 @@ _3bul_codekeymap = [{
     Jaeum.NG:'a', Jaeum.J: '#',
     Jaeum.C: 'Z', Jaeum.K: 'C',
     Jaeum.T: 'W', Jaeum.P: 'Q', Jaeum.H: '1',
-    u'': '',
+    '': '',
 }]
 
 _3bul_keycodemap = []
@@ -591,9 +591,9 @@ class Automata_Hangul3(object):
         self.clearcomp()
 
     def clearcomp(self):
-        self.choseong = u''
-        self.jungseong = u''
-        self.jongseong = u''
+        self.choseong = ''
+        self.jungseong = ''
+        self.jongseong = ''
 
     def clear(self):
         self.buff = ['']
@@ -608,18 +608,18 @@ class Automata_Hangul3(object):
         map(self.feed, s)
         self.finalize()
 
-        return u''.join(self.buff)
+        return ''.join(self.buff)
     
     def finalize(self):
         if self.choseong or self.jungseong or self.jongseong:
             self.pushcomp()
         if self.word_raw or self.word_comp:
             if self.word_valid:
-                rjoi = u''.join(self.word_comp)
+                rjoi = ''.join(self.word_comp)
                 r = 0
             else:
                 self.word_valid = 1
-                rjoi = u''.join(self.word_raw)
+                rjoi = ''.join(self.word_raw)
                 r = 1
 
             self.word_raw, self.word_comp = [], []
@@ -667,7 +667,7 @@ class Codec_Hangul3(codecs.Codec):
 
         r = []
         for c in data:
-            if c <= u'\u0080':
+            if c <= '\u0080':
                 r.append(c.encode('ascii'))
             elif not ishangul(c):
                 r.append(c.encode(self.BASECODEC, errors=errors))

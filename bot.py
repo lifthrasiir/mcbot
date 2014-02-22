@@ -11,6 +11,7 @@ import time
 import signal
 import traceback
 import zmq
+import imp
 
 if len(sys.argv) < 9:
     print('Usage: python %s <host> <port> <nick> <password> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
@@ -169,7 +170,7 @@ class Pipe(object):
             else:
                 return str(a)
         line = ' '.join(conv2str(arg) for arg in args)
-        self.stdout.send_string(line)
+        self.stdout.send(line.encode('utf-8'))
         msg = self.stdout.recv()
         assert msg == b''
 
@@ -202,7 +203,7 @@ def loop(pipe):
 
     if PASSWORD:
         send('PASS %s' % PASSWORD)
-    send('USER mcsparcs mcsparcs ruree.net :Furutani Kaede')
+    send('USER mcbot mcbot example.com :mcbot')
     send('NICK %s' % NICK)
     nexttime = time.time() + botimpl.TICK
     while True:
@@ -229,7 +230,7 @@ def loop(pipe):
                 #    safeexec(None, getattr(botimpl, 'welcome', None), (message,))
                 elif command == 'privmsg' and len(param) > 0 and param[0].startswith('#'):
                     if ''.join(message.split()).lower() in ('%s,reload' % NICK, '%s:reload' % NICK):
-                        safeexec(param[0], reload, (botimpl,))
+                        safeexec(param[0], imp.reload, (botimpl,))
                         say(param[0], '재기동했습니다.')
                         # safeguard
                         if not isinstance(getattr(botimpl, 'TICK', None), int):

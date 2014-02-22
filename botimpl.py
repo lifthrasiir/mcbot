@@ -31,7 +31,7 @@ DB.row_factory = sqlite3.Row
 try:
     with open('db.version', 'r') as f:
         db_ver = int(f.read().strip())
-except (FileNotFoundError, ValueError):
+except (IOError, ValueError):
     db_ver = 0
 
 @contextmanager
@@ -114,11 +114,11 @@ def mcsay(s):
             bot.pipe.tellraw("@a", {"text": "", "extra": [{"text": s}]})
 
 def escape_for_like(s, esc):
-    return s.replace(esc, esc+esc).replace(u'_', esc+u'_').replace(u'%', esc+u'%')
+    return s.replace(esc, esc+esc).replace('_', esc+'_').replace('%', esc+'%')
 
 def bold(ismc, s):
-    if ismc: return u'\247l%s\247r\2476' % s
-    else: return u'\002%s\002' % s
+    if ismc: return '\247l%s\247r\2476' % s
+    else: return '\002%s\002' % s
 
 def readable_timedelta(td):
     if isinstance(td, timedelta):
@@ -139,25 +139,25 @@ def readable_timedelta(td):
             period_value, seconds = divmod(seconds, period_seconds)
             pieces.append('%s%s' % (period_value, period_name))
     if len(pieces) == 0:
-        return '0' + preiods[-1][0]
+        return '0' + periods[-1][0]
     return ' '.join(pieces)
 
 def get_user(ismc, nick, create=True):
     col = ('mcid' if ismc else 'ircnick')
-    c = DB.execute('select * from users where %s like ? escape ? limit 1;' % col, (escape_for_like(nick, u'|'), u'|'))
+    c = DB.execute('select * from users where %s like ? escape ? limit 1;' % col, (escape_for_like(nick, '|'), '|'))
     row = c.fetchone()
     if not row and ismc and create:
         status = STATUS_WHITELISTED
         DB.execute('insert into users(mcid,status) values(?,?);', (nick, status))
-        row = {u'mcid': nick, u'ircnick': None, u'status': status, u'intro': None, u'playtime': 0}
+        row = {'mcid': nick, 'ircnick': None, 'status': status, 'intro': None, 'playtime': 0}
     return row
 
 def to_ircnick(mcid):
-    c = DB.execute('select ircnick from users where mcid like ? escape ? limit 1;', (escape_for_like(mcid, u'|'), u'|'))
+    c = DB.execute('select ircnick from users where mcid like ? escape ? limit 1;', (escape_for_like(mcid, '|'), '|'))
     row = c.fetchone()
     nick = row['ircnick'] if row else None
     if nick and len(nick) > 1:
-        return nick[:1] + u'·' + nick[1:] # no beep on irc
+        return nick[:1] + '·' + nick[1:] # no beep on irc
     else:
         return nick
 
@@ -166,36 +166,36 @@ def cmd(ismc, nick, cmd, args):
     cmd = cmd.lower()
 
     if cmd == 'help' or cmd == 'commands':
-        reply(u'명령 목록: !commands, !players (!p), !who (!w), !set, !time (!t), !kit')
+        reply('명령 목록: !commands, !players (!p), !who (!w), !set, !time (!t), !kit')
         return True
 
-    if cmd == 'players' or cmd == 'p' or cmd == u'ㅔ':
+    if cmd == 'players' or cmd == 'p' or cmd == 'ㅔ':
         if ismc:
-            reply(u'%s, 이 명령은 마인크래프트 안에서는 사용할 수 없습니다.' % nick)
+            reply('%s, 이 명령은 마인크래프트 안에서는 사용할 수 없습니다.' % nick)
         else:
             bot.is_players = True
             bot.pipe.send('list')
         return True
 
-    if cmd == 'whois' or cmd == 'who' or cmd == 'w' or cmd == u'ㅈ':
+    if cmd == 'whois' or cmd == 'who' or cmd == 'w' or cmd == 'ㅈ':
         if len(args) != 1:
-            reply(u'사용법: !who <마인크래프트 아이디 또는 IRC 닉>')
+            reply('사용법: !who <마인크래프트 아이디 또는 IRC 닉>')
             return True
 
-        escaped = escape_for_like(args[0], u'|')
-        c = DB.execute('select * from users where mcid like ? escape ?;', (escaped, u'|'))
+        escaped = escape_for_like(args[0], '|')
+        c = DB.execute('select * from users where mcid like ? escape ?;', (escaped, '|'))
         row = c.fetchone()
         if not row:
-            c = DB.execute('select * from users where ircnick like ? escape ?;', (escaped, u'|'))
+            c = DB.execute('select * from users where ircnick like ? escape ?;', (escaped, '|'))
             row = c.fetchone()
             if not row:
-                reply(u'%s, 해당하는 사용자가 없습니다.' % nick)
+                reply('%s, 해당하는 사용자가 없습니다.' % nick)
                 return True
 
-        reply(u'사용자 정보: 마인크래프트 %s' % bold(ismc, row['mcid']) +
-              (u' / IRC %s' % bold(ismc, row['ircnick']) if row['ircnick'] else u'') +
-              (u' / 총 플레이 시간 %s' % bold(ismc, readable_timedelta(row['playtime']))) +
-              (u' | 소개: %s' % row['intro'] if row['intro'] else u''))
+        reply('사용자 정보: 마인크래프트 %s' % bold(ismc, row['mcid']) +
+              (' / IRC %s' % bold(ismc, row['ircnick']) if row['ircnick'] else '') +
+              (' / 총 플레이 시간 %s' % bold(ismc, readable_timedelta(row['playtime']))) +
+              (' | 소개: %s' % row['intro'] if row['intro'] else ''))
         return True
 
     if cmd == 'set':
@@ -207,41 +207,41 @@ def cmd(ismc, nick, cmd, args):
                 with transaction():
                     u = get_user(ismc, nick, create=True)
                     if u: DB.execute('update users set ircnick=? where mcid=?;', (args[1], u['mcid']))
-                reply(u'%s, IRC 닉을 설정했습니다.' % nick)
+                reply('%s, IRC 닉을 설정했습니다.' % nick)
             else:
-                reply(u'%s, 이 명령은 마인크래프트 밖에서는 사용할 수 없습니다.' % nick)
+                reply('%s, 이 명령은 마인크래프트 밖에서는 사용할 수 없습니다.' % nick)
         elif key == 'intro':
-            intro = u' '.join(args[1:]) # 공백따위...
+            intro = ' '.join(args[1:]) # 공백따위...
             with transaction():
                 u = get_user(ismc, nick, create=True)
                 if u: DB.execute('update users set intro=? where mcid=?;', (intro, u['mcid']))
             if u:
-                reply(u'%s, 자기 소개를 설정했습니다.' % nick)
+                reply('%s, 자기 소개를 설정했습니다.' % nick)
             else:
-                reply(u'%s, 이 명령을 처음 사용할 때는 마인크래프트 안에서 사용해야 합니다.' % nick)
+                reply('%s, 이 명령을 처음 사용할 때는 마인크래프트 안에서 사용해야 합니다.' % nick)
         else:
-            reply(u'사용법: !set {ircnick|intro} <값>')
+            reply('사용법: !set {ircnick|intro} <값>')
 
         return True
 
-    if cmd == 'time' or cmd == 't' or cmd == u'ㅅ':
+    if cmd == 'time' or cmd == 't' or cmd == 'ㅅ':
         leveldat = mcutil.parse_level_dat(bot.WORLDPATH)
         delta = leveldat['*LastUpdatedBefore']
         # 6000이 실제로는 정오니까 보정이 필요. 그리고 날짜는 1일째부터 시작하므로 그것도 보정.
         days, timeofday = divmod(leveldat['DayTime'] + int(delta * 20) + 30000, 24000)
         minutes = timeofday * 1440 / 24000
-        reply(u'%d일째 %02d:%02d (%d초 전 갱신)' % (days, minutes/60, minutes%60, delta))
+        reply('%d일째 %02d:%02d (%d초 전 갱신)' % (days, minutes/60, minutes%60, delta))
         return True
 
     if cmd == 'kit':
         if not ismc:
-            reply(u'%s, 이 명령은 마인크래프트 밖에서는 사용할 수 없습니다.' % nick)
+            reply('%s, 이 명령은 마인크래프트 밖에서는 사용할 수 없습니다.' % nick)
         else:
             u = get_user(ismc, nick)
             if not u or u['status'] < STATUS_WHITELISTED:
-                reply(u'%s, !set 명령을 한 번 이상 써야 합니다.' % nick)
+                reply('%s, !set 명령을 한 번 이상 써야 합니다.' % nick)
             elif u['status'] == STATUS_KITRECEIVED:
-                reply(u'%s, 이미 기본 아이템을 받았으면 다시 받을 수 없습니다. 필요하다면 관리자를 요청하세요.' % nick)
+                reply('%s, 이미 기본 아이템을 받았으면 다시 받을 수 없습니다. 필요하다면 관리자를 요청하세요.' % nick)
             else:
                 bot.pipe.give(u['mcid'], '256') # iron shovel
                 bot.pipe.give(u['mcid'], '257') # iron pickaxe
@@ -254,7 +254,7 @@ def cmd(ismc, nick, cmd, args):
                 bot.pipe.give(u['mcid'], '355') # bed
                 with transaction():
                     DB.execute('update users set status=? where mcid=?;', (STATUS_KITRECEIVED, u['mcid']))
-                reply(u'%s, 기본 아이템을 보내 드렸습니다. 만약 이상이 있다면 관리자에게 요청해 주세요.' % nick)
+                reply('%s, 기본 아이템을 보내 드렸습니다. 만약 이상이 있다면 관리자에게 요청해 주세요.' % nick)
         return True
 
 class BotHandler(bot.Handler):
@@ -281,7 +281,7 @@ class BotHandler(bot.Handler):
     def on_death(self, mcid, why):
         msg = death.msg_i18n(why)
         if msg:
-            say(u'** %s%s' % (to_ircnick(mcid) or mcid, msg))
+            say('** %s%s' % (to_ircnick(mcid) or mcid, msg))
             return True
         else:
             return False
@@ -290,18 +290,18 @@ class BotHandler(bot.Handler):
         if not bot.is_players:
             return False
         if cur == '0':
-            say(u'* 아무도 접속해 있지 않습니다')
+            say('* 아무도 접속해 있지 않습니다')
         else:
             mcidlist = mcidlist.split(', ')
             mcidlist = [to_ircnick(mcid) or mcid for mcid in mcidlist] # XXX 비효율적임
-            say(u'* %s명이 접속해 있습니다: %s' % (cur, ', '.join(mcidlist)))
+            say('* %s명이 접속해 있습니다: %s' % (cur, ', '.join(mcidlist)))
         bot.is_players = False
         return True
 
     def on_login(self, mcid, ip, entityid, coord):
         for msg in config.welcome_messages:
             self.tellraw(mcid, msg)
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
+        say('*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
         with transaction():
             DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))
 
@@ -321,9 +321,9 @@ class BotHandler(bot.Handler):
                     tdiff = now - last_login
                 DB.execute("update users set playtime = playtime + ? where mcid=?;", (tdiff.seconds, mcid))
         if tdiff:
-            say(u'*** %s님이 마인크래프트에서 나가셨습니다. (플레이 시간: %s)' % (to_ircnick(mcid) or mcid, readable_timedelta(tdiff)))
+            say('*** %s님이 마인크래프트에서 나가셨습니다. (플레이 시간: %s)' % (to_ircnick(mcid) or mcid, readable_timedelta(tdiff)))
         else:
-            say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
+            say('*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
 
     def on_pubmsg(self, mcid, text):
         print('[CHAT]', '<%s>' % mcid, text)
@@ -334,7 +334,7 @@ class BotHandler(bot.Handler):
                 parts[i], _ = self.codec3.decode(parts[i][1:])
             else:
                 parts[i], _ = self.codec2.decode(parts[i])
-        converted = u''.join(parts)
+        converted = ''.join(parts)
 
         if converted.strip():
             # 명령처럼 보이면 그걸 우선시함
@@ -346,10 +346,10 @@ class BotHandler(bot.Handler):
             # IRC와 (한글 변환이 이루어졌을 경우) 마인크래프트에 재출력
             if converted != text:
                 self.tellraw('@a', {'text': '', 'extra': [
-                    {'text': u'<%s> ' % mcid, 'color': 'gold'},
+                    {'text': '<%s> ' % mcid, 'color': 'gold'},
                     {'text': converted}
                 ]})
-            say(u'<%s> %s' % (to_ircnick(mcid) or mcid, converted))
+            say('<%s> %s' % (to_ircnick(mcid) or mcid, converted))
         return True
 
     def on_spubmsg(self, text):
@@ -393,13 +393,13 @@ def update_rss_if_needed():
         LAST_RSS = now
 
     def sayboth(msg, title, link):
-        say(u'## %s: \002%s\002 @ %s' % (msg, title, link))
-        bot.pipe.say(u'\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
+        say('## %s: \002%s\002 @ %s' % (msg, title, link))
+        bot.pipe.say('\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
     for link, title, nreplies in added:
-        sayboth(u'새 글이 올라왔습니다', title, link)
+        sayboth('새 글이 올라왔습니다', title, link)
     for link, title, nnewreplies in updated:
-        repliestext = u'%d개의 ' % nnewreplies if nnewreplies > 1 else u''
-        sayboth(repliestext + u'새 답글이 올라왔습니다', title, link)
+        repliestext = '%d개의 ' % nnewreplies if nnewreplies > 1 else ''
+        sayboth(repliestext + '새 답글이 올라왔습니다', title, link)
 
 def everytime():
     update_rss_if_needed()
@@ -427,7 +427,7 @@ def msg(channel, source, msg):
         if nick and '\001' not in msg: # no CTCP yet
             bot.pipe.tellraw('@a', {'text': '', 'extra': [
                 {'text': '[IRC] ', 'color': 'gold'},
-                {'text': '<%s> %s' % (nick, msg.replace(u'\247', u'')), 'color': 'white'}
+                {'text': '<%s> %s' % (nick, msg.replace('\247', '')), 'color': 'white'}
             ]})
 
     everytime()

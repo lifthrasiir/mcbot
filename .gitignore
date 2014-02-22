@@ -2,6 +2,7 @@
 run.sh
 db
 mcbot_config.py
+db.version
 
 # vim
 .*.swp

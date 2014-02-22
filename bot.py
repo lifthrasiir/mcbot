@@ -6,13 +6,14 @@ import sys
 import re
 import select
 import socket
+import json
 import time
 import signal
 import traceback
 import zmq
 
-if len(sys.argv) < 8:
-    print('Usage: python %s <host> <port> <nick> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
+if len(sys.argv) < 9:
+    print('Usage: python %s <host> <port> <nick> <password> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
     print('  First 4 arguments specify IRC connection; next 2 arguments specify 0proxy socket paths; the last specifies a path to MC world.')
     print('  Example: irc.ozinger.org 6670 mybot mychannel ipc:///var/run/mcbot/read ipc:///var/run/mcbot/write /var/run/minecraft/world', file=sys.stderr)
     raise SystemExit(1)
@@ -20,17 +21,21 @@ if len(sys.argv) < 8:
 LINEPARSE = re.compile("^(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)(?P<param>( +[^:][^ ]*)*)(?: +:(?P<message>.*))?$")
 
 s = socket.create_connection((sys.argv[1], sys.argv[2]))
-NICK = sys.argv[3]
-CHANNEL = sys.argv[4]
+NICK = str(sys.argv[3])
+PASSWORD = str(sys.argv[4])
+CHANNEL = str(sys.argv[5])
 
 def send(l, silent=False):
-    s.send('%s\r\n' % l.replace('\r','').replace('\n','').replace('\0',''))
+    msg = '%s\r\n' % l.replace('\r','').replace('\n','').replace('\0','')
+    s.send(msg.encode('utf8'))
     if not silent: print('>>', l)
 
 def halt(msg='그럼 이만!'):
     send('QUIT :%s' % msg);
     s.close()
-    pipe.say(u'\2474점검을 위해 봇을 잠시 내립니다.')
+    pipe.tellraw('@a', {'text': '', 'extra': [
+        {'text': '[mcbot] 점검을 위해 봇을 잠시 내립니다.', 'color': 'red'},
+    ]})
     raise SystemExit
 signal.signal(signal.SIGINT, lambda sig, frame: halt())
 signal.signal(signal.SIGTERM, lambda sig, frame: halt())
@@ -49,7 +54,7 @@ def sayerr(to):
 def safeexec(to, f, args=(), kwargs={}):
     def alarm(sig, frame):
         #for i in dir(frame):
-        #    if i.startswith('f_'): print i, repr(getattr(frame,i))[:120]
+        #    if i.startswith('f_'): print(i, repr(getattr(frame,i))[:120])
         raise ExecutionTimedOut('execution timed out')
     try:
         try:
@@ -68,15 +73,15 @@ def safeexec(to, f, args=(), kwargs={}):
 
 LIST_FLAG = False
 class Handler(object):
-    LOG_REX = re.compile(r'^\[\d\d:\d\d:\d\d\] \[Server thread\/([A-Z]+)\]\: (.*)$') 
-    IGN_REX = re.compile(r'^(?:\d+ recipes|\d+ achievements|Closing listening thread)$')
-    EXC_REX = re.compile(r'^(?:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+: .*|\tat .*)$')
+    LOG_REX = re.compile(br'^\[\d\d:\d\d:\d\d\] \[Server thread\/([A-Z]+)\]\: (.*)$') 
+    IGN_REX = re.compile(br'^(?:\d+ recipes|\d+ achievements|Closing listening thread)$')
+    EXC_REX = re.compile(br'^(?:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+: .*|\tat .*)$')
     LIST_HEADER_REX = re.compile(r'^There are (\d+)/\d+ players online:$')
-    LOGIN_REX = re.compile(ur'^([^\[]+)\[[^/]*/(.+?):\d+\] logged in with entity id (\d+) at \((-?\d+\.\d+), (-?\d+\.\d+), (-?\d+\.\d+)\)$')
-    LOGOUT_REX = re.compile(ur'^([^ ]+) lost connection: (.*)$')
-    PUBMSG_REX = re.compile(ur'^<([^>]+)> (.*)$')
-    SPUBMSG_REX = re.compile(ur'^\[Server\] (.*)$')
-    SPRIVMSG_REX = re.compile(ur'^You whisper to ([^:]+): (.*)$')
+    LOGIN_REX = re.compile(r'^([^\[]+)\[[^/]*/(.+?):\d+\] logged in with entity id (\d+) at \((-?\d+\.\d+), (-?\d+\.\d+), (-?\d+\.\d+)\)$')
+    LOGOUT_REX = re.compile(r'^([^ ]+) lost connection: (.*)$')
+    PUBMSG_REX = re.compile(r'^<([^>]+)> (.*)$')
+    SPUBMSG_REX = re.compile(r'^\[Server\] (.*)$')
+    SPRIVMSG_REX = re.compile(r'^You whisper to ([^:]+): (.*)$')
     DEATH_REX = re.compile(r'^([^\[ ]+) (.+)$')
 
     def on_info(self, msg): pass
@@ -85,7 +90,7 @@ class Handler(object):
 
     def on_death(self, nick, how): pass
     def on_list(self, cur, nicklist): pass
-    def on_login(self, nick, ip, entityid, (x,y,z)): pass
+    def on_login(self, nick, ip, entityid, coord): pass
     def on_logout(self, nick, reason): pass
     def on_pubmsg(self, nick, text): pass
     def on_spubmsg(self, text): pass
@@ -127,7 +132,7 @@ class Handler(object):
 
     def on_line(self, line):
         m = self.LOG_REX.search(line)
-        if m: return self.on_log(m.group(1), m.group(2).decode('utf-8', 'replace'))
+        if m: return self.on_log(m.group(1).decode('ascii'), m.group(2).decode('utf8', 'replace'))
         if self.EXC_REX.search(line): return self.on_exception(line)
         if self.IGN_REX.search(line): return True
 
@@ -145,7 +150,7 @@ class Pipe(object):
         if not self._stdin:
             self._stdin = self.context.socket(zmq.SUB)
             self._stdin.connect(self.inpath)
-            self._stdin.setsockopt(zmq.SUBSCRIBE, '')
+            self._stdin.setsockopt(zmq.SUBSCRIBE, b'')
         return self._stdin
 
     @property
@@ -156,10 +161,17 @@ class Pipe(object):
         return self._stdout
 
     def send(self, *args):
-        line = ' '.join(arg.encode('utf-8') if isinstance(arg, unicode) else arg for arg in args)
-        self.stdout.send(line)
+        def conv2str(a):
+            if isinstance(a, dict) or isinstance(a, list): # for raw JSON messages
+                return json.dumps(a)
+            elif isinstance(a, str):
+                return a
+            else:
+                return str(a)
+        line = ' '.join(conv2str(arg) for arg in args)
+        self.stdout.send_string(line)
         msg = self.stdout.recv()
-        assert msg == ''
+        assert msg == b''
 
     def recv(self):
         return self.stdin.recv()
@@ -168,16 +180,18 @@ class Pipe(object):
         def wrapper(*args): return self.send(name, *args)
         return wrapper
 
-pipe = Pipe(read=sys.argv[5], write=sys.argv[6])
+pipe = Pipe(read=sys.argv[6], write=sys.argv[7])
 assert pipe.stdin and pipe.stdout
 
-WORLDPATH = sys.argv[7]
+WORLDPATH = sys.argv[8]
 
 
 def update_excepthook(pipe):
     origexcepthook = sys.excepthook
     def excepthook(ty, exc, tb):
-        pipe.say(u'\2474봇 종료: %s %s' % (ty.__name__, str(exc)[:100]))
+        pipe.tellraw('@a', {'text': '', 'extra': [
+            {'text': '[mcbot] 봇 종료: %s %s' % (ty.__name__, str(exc)[:100]), 'color': 'red'},
+        ]})
         return origexcepthook(ty, exc, tb)
     sys.excepthook = excepthook
 
@@ -186,16 +200,18 @@ def loop(pipe):
     poller.register(pipe.stdin, zmq.POLLIN)
     poller.register(s, zmq.POLLIN)
 
-    send('USER kaede kaede ruree.net :Furutani Kaede')
+    if PASSWORD:
+        send('PASS %s' % PASSWORD)
+    send('USER mcsparcs mcsparcs ruree.net :Furutani Kaede')
     send('NICK %s' % NICK)
     nexttime = time.time() + botimpl.TICK
     while True:
-        line = ''
-        while not line.endswith('\r\n'):
+        line = b''
+        while not line.endswith(b'\r\n'):
             ch = s.recv(1)
-            if ch == '': break
+            if ch == b'': break
             line += ch
-        line = line.rstrip('\r\n')
+        line = line.rstrip(b'\r\n').decode('utf8', 'replace')
         m = LINEPARSE.match(line)
         if m:
             prefix = m.group('prefix') or ''

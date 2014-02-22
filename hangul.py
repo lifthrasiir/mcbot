@@ -82,9 +82,9 @@ Choseong = Jaeum.Choseong
 Jungseong = Moeum.Jungseong
 Jongseong = Jaeum.Jongseong
 
-for name, code in Jaeum.__dict__.items() + Moeum.__dict__.items():
+for name, code in list(Jaeum.__dict__.items()) + list(Moeum.__dict__.items()):
     if name.isupper() and len(name) <= 3:
-        exec "%s = %s" % (name, repr(code))
+        exec("%s = %s" % (name, repr(code)))
 del name, code
 
 # Unicode Hangul Syllables Characteristics
@@ -468,7 +468,7 @@ class Codec_Hangul2(codecs.Codec):
     # Unicode to key stroke
     def encode(self, data, errors='strict'):
         if errors not in ('strict', 'ignore', 'replace'):
-            raise ValueError, "unknown error handling"
+            raise ValueError("unknown error handling")
 
         r = []
         for c in data:
@@ -486,7 +486,7 @@ class Codec_Hangul2(codecs.Codec):
     # key stroke to Unicode
     def decode(self, data, errors='strict'):
         if errors not in ('strict', 'ignore', 'replace'):
-            raise ValueError, "unknown error handling"
+            raise ValueError("unknown error handling")
 
         if isinstance(data, unicode):
             s = data
@@ -663,7 +663,7 @@ class Codec_Hangul3(codecs.Codec):
     # Unicode to key stroke
     def encode(self, data, errors='strict'):
         if errors not in ('strict', 'ignore', 'replace'):
-            raise ValueError, "unknown error handling"
+            raise ValueError("unknown error handling")
 
         r = []
         for c in data:
@@ -681,7 +681,7 @@ class Codec_Hangul3(codecs.Codec):
     # key stroke to Unicode
     def decode(self, data, errors='strict'):
         if errors not in ('strict', 'ignore', 'replace'):
-            raise ValueError, "unknown error handling"
+            raise ValueError("unknown error handling")
 
         if isinstance(data, unicode):
             s = data

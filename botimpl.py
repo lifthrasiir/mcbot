@@ -8,8 +8,9 @@ import re
 import os
 import os.path
 import time
+from datetime import datetime, timedelta
 import sqlite3
-import urllib2
+import urllib.request
 from xml.etree import cElementTree as ET
 from contextlib import contextmanager
 
@@ -26,18 +27,12 @@ if __name__ != '__main__':
 
 DB = sqlite3.connect(os.path.join(os.path.dirname(__file__), 'db', 'kaede.db'))
 DB.row_factory = sqlite3.Row
-DB.executescript('''
-    create table if not exists users(
-        mcid text not null primary key,
-        ircnick text,
-        status integer not null,
-        intro text);
-''')
-
-STATUS_BLOCKED = -1
-STATUS_INVITED = 0
-STATUS_WHITELISTED = 1
-STATUS_KITRECEIVED = 2
+# Database 버전 체크
+try:
+    with open('db.version', 'r') as f:
+        db_ver = int(f.read().strip())
+except (FileNotFoundError, ValueError):
+    db_ver = 0
 
 @contextmanager
 def transaction():
@@ -49,18 +44,42 @@ def transaction():
     else: 
         DB.commit()
 
+if db_ver == 0:
+    DB.executescript('''
+        create table if not exists users(
+            mcid text not null primary key,
+            ircnick text,
+            status integer not null,
+            intro text);
+    ''')
+    with transaction():
+        # last_login은 SQLite의 datetime('now') 함수를 이용해 UTC 기준으로 저장된다.
+        DB.executescript('''
+            alter table users add playtime integer default 0;
+            alter table users add last_login text;
+        ''')
+    db_ver = 1
+    with open('db.version', 'w') as f:
+        f.write(str(db_ver))
+# 미래에 db에 추가되는 필드가 있으면 새로운 elif cluase를 추가한다.
+
+STATUS_BLOCKED = -1
+STATUS_INVITED = 0
+STATUS_WHITELISTED = 1
+STATUS_KITRECEIVED = 2
+
 class RSSWatcher(object):
     def __init__(self, url):
         self.url = url
         self.prevtitles = self.get_titles()
 
     def get_titles(self):
-        tree = ET.fromstring(urllib2.urlopen(self.url, timeout=1).read())
+        tree = ET.fromstring(urllib.request.urlopen(self.url, timeout=1).read())
         titles = {}
         for item in tree.findall('./channel/item'):
             title = item.find('title').text
             nreplies = None
-            m = re.search(ur'^(.*?) \(([0-9]+)\)$', title) # sanitize for kareha
+            m = re.search(r'^(.*?) \(([0-9]+)\)$', title) # sanitize for kareha
             if m:
                 title = m.group(1)
                 nreplies = int(m.group(2))
@@ -85,10 +104,14 @@ class RSSWatcher(object):
 
 
 def say(s):
-    if s: bot.say(bot.CHANNEL, s.encode('utf-8'))
+    if s: bot.say(bot.CHANNEL, s if isinstance(s, str) else str(s))
 
 def mcsay(s):
-    if s: bot.pipe.say(u'\2476%s' % s)
+    if s:
+        if isinstance(s, dict):
+            bot.pipe.tellraw("@a", s)
+        else:
+            bot.pipe.tellraw("@a", {"text": "", "extra": [{"text": s}]})
 
 def escape_for_like(s, esc):
     return s.replace(esc, esc+esc).replace(u'_', esc+u'_').replace(u'%', esc+u'%')
@@ -97,6 +120,28 @@ def bold(ismc, s):
     if ismc: return u'\247l%s\247r\2476' % s
     else: return u'\002%s\002' % s
 
+def readable_timedelta(td):
+    if isinstance(td, timedelta):
+        seconds = td.seconds
+    else:
+        seconds = int(td)
+    periods = [
+        ('년',   60*60*24*365),
+        ('월',   60*60*24*30),
+        ('일',   60*60*24),
+        ('시간', 60*60),
+        ('분',   60),
+        ('초',   1)
+    ]
+    pieces = []
+    for period_name, period_seconds in periods:
+        if seconds >= period_seconds:
+            period_value, seconds = divmod(seconds, period_seconds)
+            pieces.append('%s%s' % (period_value, period_name))
+    if len(pieces) == 0:
+        return '0' + preiods[-1][0]
+    return ' '.join(pieces)
+
 def get_user(ismc, nick, create=True):
     col = ('mcid' if ismc else 'ircnick')
     c = DB.execute('select * from users where %s like ? escape ? limit 1;' % col, (escape_for_like(nick, u'|'), u'|'))
@@ -104,7 +149,7 @@ def get_user(ismc, nick, create=True):
     if not row and ismc and create:
         status = STATUS_WHITELISTED
         DB.execute('insert into users(mcid,status) values(?,?);', (nick, status))
-        row = {u'mcid': nick, u'ircnick': None, u'status': status, u'intro': None}
+        row = {u'mcid': nick, u'ircnick': None, u'status': status, u'intro': None, u'playtime': 0}
     return row
 
 def to_ircnick(mcid):
@@ -149,6 +194,7 @@ def cmd(ismc, nick, cmd, args):
 
         reply(u'사용자 정보: 마인크래프트 %s' % bold(ismc, row['mcid']) +
               (u' / IRC %s' % bold(ismc, row['ircnick']) if row['ircnick'] else u'') +
+              (u' / 총 플레이 시간 %s' % bold(ismc, readable_timedelta(row['playtime']))) +
               (u' | 소개: %s' % row['intro'] if row['intro'] else u''))
         return True
 
@@ -221,15 +267,15 @@ class BotHandler(bot.Handler):
         return getattr(self.pipe, name)
 
     def on_info(self, msg):
-        print '[INFO]', msg
+        print('[INFO]', msg)
         return True
 
     def on_warning(self, msg):
-        print '[WARNING]', msg
+        print('[WARNING]', msg)
         return True
 
     def on_exception(self, line):
-        print '[EXCEPT]', line
+        print('[EXCEPT]', line)
         return True
 
     def on_death(self, mcid, why):
@@ -252,19 +298,38 @@ class BotHandler(bot.Handler):
         bot.is_players = False
         return True
 
-    def on_login(self, nick, ip, entityid, coord):
+    def on_login(self, mcid, ip, entityid, coord):
         for msg in config.welcome_messages:
-            self.tell(nick, msg)
-        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % nick)
+            self.tellraw(mcid, msg)
+        say(u'*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
+        with transaction():
+            DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))
 
     def on_logout(self, mcid, reason):
-        say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
+        tdiff = None
+        with transaction():
+            c = DB.execute('select last_login from users where mcid=?', (mcid,))
+            row = c.fetchone()
+            if row:
+                if row['last_login'] is None:
+                    # 이 경우는 기존 사용자가 로그인 중인 상태에서 봇을 업데이트한 경우.
+                    # 언제 로그인했는지 알 수 없으므로 일단 0으로 초기화한다.
+                    tdiff = timedelta(seconds=0)
+                else:
+                    now = datetime.utcnow()
+                    last_login = datetime.strptime(row['last_login'], "%Y-%m-%d %H:%M:%S")
+                    tdiff = now - last_login
+                DB.execute("update users set playtime = playtime + ? where mcid=?;", (tdiff.seconds, mcid))
+        if tdiff:
+            say(u'*** %s님이 마인크래프트에서 나가셨습니다. (플레이 시간: %s)' % (to_ircnick(mcid) or mcid, readable_timedelta(tdiff)))
+        else:
+            say(u'*** %s님이 마인크래프트에서 나가셨습니다.' % (to_ircnick(mcid) or mcid))
 
     def on_pubmsg(self, mcid, text):
-        print '[CHAT]', '<%s>' % mcid, text
+        print('[CHAT]', '<%s>' % mcid, text)
 
         parts = text.split('--')
-        for i in xrange(1, len(parts), 2):
+        for i in range(1, len(parts), 2):
             if parts[i].startswith('-'):
                 parts[i], _ = self.codec3.decode(parts[i][1:])
             else:
@@ -280,23 +345,26 @@ class BotHandler(bot.Handler):
 
             # IRC와 (한글 변환이 이루어졌을 경우) 마인크래프트에 재출력
             if converted != text:
-                self.say(u'\2477<%s>\247r %s' % (mcid, converted))
+                self.tellraw('@a', {'text': '', 'extra': [
+                    {'text': u'<%s> ' % mcid, 'color': 'gold'},
+                    {'text': converted}
+                ]})
             say(u'<%s> %s' % (to_ircnick(mcid) or mcid, converted))
         return True
 
     def on_spubmsg(self, text):
-        print '[CHAT]', '<<', text
+        print('[CHAT]', '<<', text)
         return True
 
     def on_sprivmsg(self, target, text):
-        print '[CHAT]', '%s<<' % target, text
+        print('[CHAT]', '%s<<' % target, text)
         return True
 
 
 def getnick(source):
     try:
-        nick = source.split('!')[0].decode('utf-8', 'replace')
-        if nick.encode('utf-8') == bot.NICK: return None
+        nick = source.split('!')[0]
+        if nick == bot.NICK: return None
         return nick
     except Exception:
         return None
@@ -343,12 +411,11 @@ def handle(line):
     handler = BotHandler(bot.pipe)
     result = handler.on_line(line)
     if result is None:
-        print '*** unhandled: %s' % line
+        print('*** unhandled: %s' % line)
 
     everytime()
 
 def msg(channel, source, msg):
-    msg = msg.decode('utf-8', 'replace')
     wascmd = False
     if msg.startswith('!'):
         args = msg[1:].split()
@@ -358,17 +425,24 @@ def msg(channel, source, msg):
     if not wascmd:
         nick = getnick(source)
         if nick and '\001' not in msg: # no CTCP yet
-            bot.pipe.say(u'\2476[IRC] <%s>\247e %s' % (nick, msg.replace(u'\247', u'')))
+            bot.pipe.tellraw('@a', {'text': '', 'extra': [
+                {'text': '[IRC] ', 'color': 'gold'},
+                {'text': '<%s> %s' % (nick, msg.replace(u'\247', u'')), 'color': 'white'}
+            ]})
 
     everytime()
 
 def line(command, source, param, message):
     if command == 'join':
         nick = getnick(source)
-        if nick: bot.pipe.say(u'\2476[IRC] %s님이 입장하셨습니다.' % nick)
+        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+            {'text': '[IRC] %s님이 입장하셨습니다.' % nick, 'color': 'gold'}
+        ]})
     elif command == 'part':
         nick = getnick(source)
-        if nick: bot.pipe.say(u'\2476[IRC] %s님이 나가셨습니다.' % nick)
+        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+            {'text': '[IRC] %s님이 나가셨습니다.' % nick, 'color': 'gold'}
+        ]})
 
     everytime()
 

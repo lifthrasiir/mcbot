@@ -62,8 +62,7 @@ FINISH = 90		# CHOSEONG*에서 초성을 입력하거나, JOONGSEONG*태에서 �
 FINISH2 = 92	# JOONGSEONG 또는 JONGSEONG* 상태에서 모음을 입력한 경우
 
 import codecs
-# cStringIO 모듈이 더 빠르지만 unicode를 지원하지 않음
-from StringIO import StringIO
+from io import StringIO
 
 # 보조 함수
 def choose_index(key, array):
@@ -92,7 +91,7 @@ def conv2unicode(queue):
 	c1, c2, c3 = -1, -1, -1
 	
 	q = []
-	for i in xrange(6):
+	for i in range(6):
 		q.append (queue[i])
 	
 	## 자음 처리
@@ -164,7 +163,7 @@ def conv2unicode(queue):
 
 	## 최종 코드 생성
 	if jamo_only:
-		return unichr(0x3131 + c1)
+		return chr(0x3131 + c1)
 	else:
 		c1 = choose_index(c1, (0, 1, 3, 6, 7, 8, 16, 17, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29))
 		c2 = c2 - 30
@@ -172,7 +171,7 @@ def conv2unicode(queue):
  					    (0, 1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 0, 18, 19, 20, 21, 22, 0, 23, 24, 25, 26, 27))
 		if c1 == None or c2 == -31 or c3 == None:
 			return ''
-		return unichr(0xAC00 + c1 * 588 + c2 * 28 + c3)
+		return chr(0xAC00 + c1 * 588 + c2 * 28 + c3)
 
 class H2Automaton(object):
 	"""한글 두벌식 오토마타 클래스"""
@@ -365,12 +364,12 @@ class Codec_AchimHangul2(codecs.Codec):
     # key stroke to Unicode
     def decode(self, data, errors='strict'):
         if errors not in ('strict', 'ignore', 'replace'):
-            raise ValueError, "unknown error handling"
+            raise ValueError("unknown error handling")
 
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             s = data
         else:
-            s = unicode(data, self.BASECODEC, errors)
+            s = str(data, self.BASECODEC, errors)
         r = to_hangul2(s)
         return (r, len(r))
 

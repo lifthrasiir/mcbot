@@ -158,7 +158,7 @@ def join(codes):
     if not codes[0] or not codes[1]: # single jamo
         return codes[0] or codes[1]
 
-    return unichr(
+    return chr(
         0xac00 + (
             Choseong.index(codes[0])*NJUNGSEONG +
             Jungseong.index(codes[1])
@@ -214,17 +214,17 @@ def disjoint(s):
         if _ishangul(c):
             cho, jung, jong = split(c)
             if cho:
-                obuff.append( unichr(ord(JBASE_CHOSEONG) + Choseong.index(cho)) )
+                obuff.append( chr(ord(JBASE_CHOSEONG) + Choseong.index(cho)) )
             else:
                 obuff.append( CHOSEONG_FILLER )
 
             if jung:
-                obuff.append( unichr(ord(JBASE_JUNGSEONG) + Jungseong.index(jung)) )
+                obuff.append( chr(ord(JBASE_JUNGSEONG) + Jungseong.index(jung)) )
             else:
                 obuff.append( JUNGSEONG_FILLER )
 
             if jong:
-                obuff.append( unichr(ord(JBASE_JONGSEONG) + Jongseong.index(jong) - 1) )
+                obuff.append( chr(ord(JBASE_JONGSEONG) + Jongseong.index(jong) - 1) )
         else:
             obuff.append(c)
     return ''.join(obuff)
@@ -271,11 +271,11 @@ def format(fmtstr, *args, **kwargs):
             fmt  += c
             ofmt = ''
         else:
-            if ofmt and ALT_SUFFIXES.has_key(c):
+            if ofmt and c in ALT_SUFFIXES:
                 obuff.append(ALT_SUFFIXES[c][
                     _has_final(ofmt[-1])[1] and 1 or 0
                 ])
-            elif ofmt and IDA_SUFFIXES.has_key(fmtstr[ncur:ncur+3]):
+            elif ofmt and fmtstr[ncur:ncur+3] in IDA_SUFFIXES:
                 sel = IDA_SUFFIXES[fmtstr[ncur:ncur+3]]
                 ishan, hasfinal = _has_final(ofmt[-1])
 
@@ -283,7 +283,7 @@ def format(fmtstr, *args, **kwargs):
                     obuff.append(sel[1])
                 elif ishan:
                     if sel[0]:
-                        obuff[-1] = obuff[-1][:-1] + unichr(ord(ofmt[-1]) + sel[0])
+                        obuff[-1] = obuff[-1][:-1] + chr(ord(ofmt[-1]) + sel[0])
                 else:
                     obuff.append(sel[0] and sel[1])
                 ncur += 2
@@ -379,7 +379,7 @@ class Automata_Hangul2(object):
     def convert(self, s):
         self.clear()
 
-        map(self.feed, s)
+        for c in s: self.feed(c)
         self.finalize()
 
         return ''.join(self.buff)
@@ -426,7 +426,7 @@ class Automata_Hangul2(object):
                         self.jongsung = code
                 else: # full
                     trymul = _2bul_codekeymap[self.jongsung] + c
-                    if _2bul_keycodemap.has_key(trymul): # can be multi jongsung
+                    if trymul in _2bul_keycodemap: # can be multi jongsung
                         self.jongsung = _2bul_keycodemap[trymul]
                     else:
                         self.pushcomp()
@@ -437,7 +437,7 @@ class Automata_Hangul2(object):
                         self.jungsung = code
                     else: # jungsung O  jongsung X
                         trymul = _2bul_codekeymap[self.jungsung] + c
-                        if _2bul_keycodemap.has_key(trymul): # can be multi jungsung
+                        if trymul in _2bul_keycodemap: # can be multi jungsung
                             self.jungsung = _2bul_keycodemap[trymul]
                         else:
                             self.pushcomp()
@@ -488,10 +488,10 @@ class Codec_Hangul2(codecs.Codec):
         if errors not in ('strict', 'ignore', 'replace'):
             raise ValueError("unknown error handling")
 
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             s = data
         else:
-            s = unicode(data, self.BASECODEC, errors)
+            s = str(data, self.BASECODEC, errors)
         am = Automata_Hangul2()
         r = am.convert(s)
         return (r, len(r))
@@ -605,7 +605,7 @@ class Automata_Hangul3(object):
     def convert(self, s):
         self.clear()
 
-        map(self.feed, s)
+        for c in s: self.feed(c)
         self.finalize()
 
         return ''.join(self.buff)
@@ -683,10 +683,10 @@ class Codec_Hangul3(codecs.Codec):
         if errors not in ('strict', 'ignore', 'replace'):
             raise ValueError("unknown error handling")
 
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             s = data
         else:
-            s = unicode(data, self.BASECODEC, errors)
+            s = str(data, self.BASECODEC, errors)
         am = Automata_Hangul3()
         r = am.convert(s)
         return (r, len(r))

@@ -228,7 +228,7 @@ def loop(pipe):
                 #elif command == 'invite' and len(param) > 0 and message:
                 #    send('JOIN %s' % message)
                 #    safeexec(None, getattr(botimpl, 'welcome', None), (message,))
-                elif command == 'privmsg' and len(param) > 0 and param[0].startswith('#'):
+                elif command == 'privmsg' and len(param) > 0 and param[0].startswith('#') and param[0] == CHANNEL:
                     if ''.join(message.split()).lower() in ('%s,reload' % NICK, '%s:reload' % NICK):
                         safeexec(param[0], imp.reload, (botimpl,))
                         say(param[0], '재기동했습니다.')

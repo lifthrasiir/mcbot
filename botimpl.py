@@ -1,3 +1,4 @@
+#! /usr/bin/env python3.4
 # coding=utf-8
 
 TICK = 30
@@ -109,9 +110,9 @@ def say(s):
 def mcsay(s):
     if s:
         if isinstance(s, dict):
-            bot.pipe.tellraw("@a", s)
+            bot.send_to_mc('tellraw', "@a", s)
         else:
-            bot.pipe.tellraw("@a", {"text": "", "extra": [{"text": s}]})
+            bot.send_to_mc('tellraw', "@a", {"text": "", "extra": [{"text": s}]})
 
 def escape_for_like(s, esc):
     return s.replace(esc, esc+esc).replace('_', esc+'_').replace('%', esc+'%')
@@ -174,7 +175,7 @@ def cmd(ismc, nick, cmd, args):
             reply('%s, 이 명령은 마인크래프트 안에서는 사용할 수 없습니다.' % nick)
         else:
             bot.is_players = True
-            bot.pipe.send('list')
+            bot.send_to_mc('list')
         return True
 
     if cmd == 'whois' or cmd == 'who' or cmd == 'w' or cmd == 'ㅈ':
@@ -243,28 +244,24 @@ def cmd(ismc, nick, cmd, args):
             elif u['status'] == STATUS_KITRECEIVED:
                 reply('%s, 이미 기본 아이템을 받았으면 다시 받을 수 없습니다. 필요하다면 관리자를 요청하세요.' % nick)
             else:
-                bot.pipe.give(u['mcid'], '256') # iron shovel
-                bot.pipe.give(u['mcid'], '257') # iron pickaxe
-                bot.pipe.give(u['mcid'], '258') # iron axe
-                bot.pipe.give(u['mcid'], '292') # iron hoe
-                bot.pipe.give(u['mcid'], '267') # iron sword
-                bot.pipe.give(u['mcid'], '50', '64') # 64x torch
-                bot.pipe.give(u['mcid'], '297', '64') # 64x bread
-                bot.pipe.give(u['mcid'], '328') # minecart
-                bot.pipe.give(u['mcid'], '355') # bed
+                bot.send_to_mc('give', u['mcid'], '256') # iron shovel
+                bot.send_to_mc('give', u['mcid'], '257') # iron pickaxe
+                bot.send_to_mc('give', u['mcid'], '258') # iron axe
+                bot.send_to_mc('give', u['mcid'], '292') # iron hoe
+                bot.send_to_mc('give', u['mcid'], '267') # iron sword
+                bot.send_to_mc('give', u['mcid'], '50', '64') # 64x torch
+                bot.send_to_mc('give', u['mcid'], '297', '64') # 64x bread
+                bot.send_to_mc('give', u['mcid'], '328') # minecart
+                bot.send_to_mc('give', u['mcid'], '355') # bed
                 with transaction():
                     DB.execute('update users set status=? where mcid=?;', (STATUS_KITRECEIVED, u['mcid']))
                 reply('%s, 기본 아이템을 보내 드렸습니다. 만약 이상이 있다면 관리자에게 요청해 주세요.' % nick)
         return True
 
 class BotHandler(bot.Handler):
-    def __init__(self, pipe):
-        self.pipe = pipe
+    def __init__(self):
         self.codec2 = hangul2.Codec_AchimHangul2()
         self.codec3 = hangul.Codec_Hangul3()
-
-    def __getattr__(self, name):
-        return getattr(self.pipe, name)
 
     def on_info(self, msg):
         print('[INFO]', msg)
@@ -300,7 +297,7 @@ class BotHandler(bot.Handler):
 
     def on_login(self, mcid, ip, entityid, coord):
         for msg in config.welcome_messages:
-            self.tellraw(mcid, msg)
+            bot.send_to_mc('tellraw', mcid, msg)
         say('*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
         with transaction():
             DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))
@@ -345,7 +342,7 @@ class BotHandler(bot.Handler):
 
             # IRC와 (한글 변환이 이루어졌을 경우) 마인크래프트에 재출력
             if converted != text:
-                self.tellraw('@a', {'text': '', 'extra': [
+                bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
                     {'text': '<%s> ' % mcid, 'color': 'gold'},
                     {'text': converted}
                 ]})
@@ -394,7 +391,7 @@ def update_rss_if_needed():
 
     def sayboth(msg, title, link):
         say('## %s: \002%s\002 @ %s' % (msg, title, link))
-        bot.pipe.say('\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
+        bot.send_to_mc('say', '\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
     for link, title, nreplies in added:
         sayboth('새 글이 올라왔습니다', title, link)
     for link, title, nnewreplies in updated:
@@ -408,7 +405,7 @@ def idle():
     everytime()
 
 def handle(line):
-    handler = BotHandler(bot.pipe)
+    handler = BotHandler()
     result = handler.on_line(line)
     if result is None:
         print('*** unhandled: %s' % line)
@@ -425,7 +422,7 @@ def msg(channel, source, msg):
     if not wascmd:
         nick = getnick(source)
         if nick and '\001' not in msg: # no CTCP yet
-            bot.pipe.tellraw('@a', {'text': '', 'extra': [
+            bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
                 {'text': '[IRC] ', 'color': 'gold'},
                 {'text': '<%s> %s' % (nick, msg.replace('\247', '')), 'color': 'white'}
             ]})
@@ -435,12 +432,12 @@ def msg(channel, source, msg):
 def line(command, source, param, message):
     if command == 'join':
         nick = getnick(source)
-        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+        if nick: bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
             {'text': '[IRC] %s님이 입장하셨습니다.' % nick, 'color': 'gold'}
         ]})
     elif command == 'part':
         nick = getnick(source)
-        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+        if nick: bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
             {'text': '[IRC] %s님이 나가셨습니다.' % nick, 'color': 'gold'}
         ]})
 

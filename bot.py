@@ -49,7 +49,7 @@ def sayerr(to):
     traceback.print_exception(ty, exc, tb)
 
 def halt(msg='그럼 이만!'):
-    #send_to_irc('QUIT :%s' % msg);
+    send_to_irc('QUIT :%s' % msg);
     send_to_mc('tellraw', '@a', {'text': '[mcbot] 점검을 위해 봇을 잠시 내립니다.', 'color': 'red'})
     raise SystemExit
 
@@ -175,11 +175,13 @@ class IRCHandler(asyncio.Protocol):
         })
 
     def connection_lost(self, exc):
-        print("Connection to the IRC server is lost.", file=sys.stderr)
-        send_to_mc('tellraw', '@a', {
-            'text': '[mcbot] IRC 서버와의 연결이 끊어졌습니다. 다시 연결을 시도합니다.', 'color': 'red'
-        })
-        # TODO: reconnect
+        if exc is not None:
+            print("Connection to the IRC server is lost.", file=sys.stderr)
+            # The other side has closed the connection.
+            send_to_mc('tellraw', '@a', {
+                'text': '[mcbot] IRC 서버와의 연결이 끊어졌습니다. 다시 연결을 시도합니다.', 'color': 'red'
+            })
+            # TODO: reconnect
 
     def eof_received(self):
         # This is called when QUIT message is sent to the IRC server normally

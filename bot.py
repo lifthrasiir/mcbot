@@ -22,6 +22,7 @@ CHANNEL  = None
 MC_READ_SOCK, MC_WRITE_SOCK = None, None
 WORLDPATH = None
 
+zmqctx = None
 send_to_mc  = None  # initialized in mc_init
 send_to_irc = None  # initialized in irc_loop_coro
 
@@ -29,7 +30,7 @@ def say(to, msg):
     if send_to_irc is not None and callable(send_to_irc):
         send_to_irc('PRIVMSG %s :%s' % (to, msg))
     else:
-        raise Exception('Unexpected timing to call send_to_irc()')
+        raise RuntimeError('Unexpected timing to call send_to_irc()')
 
 def sayerr(to):
     ty, exc, tb = sys.exc_info()
@@ -38,33 +39,35 @@ def sayerr(to):
     traceback.print_exception(ty, exc, tb)
 
 def halt(msg='그럼 이만!'):
-    send_to_irc('QUIT :%s' % msg);
     send_to_mc('tellraw', '@a', {'text': '[mcbot] 점검을 위해 봇을 잠시 내립니다.', 'color': 'red'})
-    raise SystemExit
+    # NOTE: For Slack IRC gateway, this would not show any message due to
+    #       "persistent" connection between the gateway and the Slack channel.
+    #       Only de-voicing itself will be visible to the channel members.
+    irc_writer = send_to_irc('QUIT :%s' % msg, terminate=True);
+    loop = asyncio.get_event_loop()
+    loop.stop()
+    # Ensure the QUIT message is sent.
+    drain = irc_writer.drain()
+    if drain: loop.run_until_complete(drain)
+    irc_writer.close()
+    # Explicitly destory the ZMQ context since it may have separate threads.
+    # For some reason(?), zmqctx.term() method does not work well...
+    if zmqctx:
+        zmqctx.destroy()
 
-def async_do(future, func, args, kwargs):
-    try:
-        ret = func(*args, **kwargs)
-    except Exception as exc:
-        # TODO: sayerr(to)
-        future.set_exception(exc)
-    else:
-        future.set_result(ret)
-
-def safeexec(to, f, args=(), kwargs=None):
+def safeexec(to, f, args=(), kwargs=None, callback=None):
     # TODO: This does not restrict the duration of execution as expected.
     #       The primary reason is that coroutine-ignorant blocking cannot
     #       be handled by the asyncio package.
     # TODO: On *NIX systems we can use SIGARLAM as before.
     #       But how to do the same thing with Windows?
-    fut = asyncio.Future()
     if kwargs is None: kwargs = {}
-    loop = asyncio.get_event_loop()
-    loop.call_soon(async_do, fut, f, args, kwargs)
     try:
-        asyncio.async(asyncio.wait_for(fut, botimpl.TIMEOUT))
-    except TimeoutError:
-        raise
+        f(*args, **kwargs)
+    except Exception:
+        sayerr(to)
+    else:
+        if callback: callback()
 
 
 LIST_FLAG = False
@@ -189,14 +192,22 @@ class AsyncZMQSocketReader:
             fut.set_result(data)
 
 def mc_init(read_path, write_path):
+    global zmqctx
+    # NOTE: zmq.Context() implicitly creates a thread "for IO" by default.
+    #       (This behaviour may vary by the underlying ZMQ library version,
+    #       but at least major version >= 3 does according to the source:
+    #       https://github.com/zeromq/pyzmq/blob/master/zmq/backend/cython/context.pyx)
+    #       This thread should be explicitly destroyed when terminating since
+    #       Python only delivers the signals to the main thread.
     context = zmq.Context()
+    zmqctx = context
     _stdin = context.socket(zmq.SUB)
     _stdin.connect(read_path)
     _stdin.setsockopt(zmq.SUBSCRIBE, b'')
     wrapped_stdin = AsyncZMQSocketReader(context, _stdin)
     _stdout = context.socket(zmq.REQ)
     _stdout.connect(write_path)
-    def _send(*args):
+    def _send_to_mc(*args):
         def conv2str(arg):
             if isinstance(arg, dict) or isinstance(arg, list):  # for raw JSON messages
                 return json.dumps(arg)
@@ -205,10 +216,13 @@ def mc_init(read_path, write_path):
             else:
                 return str(arg)
         line = ' '.join(conv2str(arg) for arg in args)
-        _stdout.send(line.encode('utf-8'))
-        msg = _stdout.recv()
-        assert msg == b''
-    return _send, wrapped_stdin
+        try:
+            _stdout.send(line.encode('utf-8'))
+            msg = _stdout.recv()  # consume ack
+            assert msg == b''
+        except zmq.error.ContextTerminated:
+            pass
+    return _send_to_mc, wrapped_stdin
 
 @asyncio.coroutine
 def mc_loop_coro(wrapped_stdin):
@@ -216,17 +230,24 @@ def mc_loop_coro(wrapped_stdin):
         line = yield from wrapped_stdin.recv()
         if not line:
             print('Connection to the Minecraft server is lost.', file=sys.stderr)
-            say(CHANNEL, '마인크래프트 서버와의 연결이 유실되었습니다. 관리자에게 문의하세요.')
+            say('마인크래프트 서버와의 연결이 유실되어 봇을 종료합니다. 관리자에게 문의하세요.')
+            halt()
+            break
         safeexec(None, getattr(botimpl, 'handle', None), (line,))
 
 @asyncio.coroutine
 def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
     while True:
         irc_reader, irc_writer = yield from asyncio.open_connection(irc_host, irc_port, *args, **kwargs)
-        def _send_to_irc(line, silent=False):
+        def _send_to_irc(line, silent=False, terminate=False):
             msg = '%s\r\n' % line.replace('\r','').replace('\n','').replace('\0','')
             irc_writer.write(msg.encode('utf8'))
             if not silent: print('>>', line)
+            if terminate:
+                # Try to gracefully close the socket
+                # and return the writer for last-minute synchronization.
+                if irc_writer.can_write_eof(): irc_writer.write_eof()
+                return irc_writer
         global send_to_irc
         send_to_irc = _send_to_irc
         if PASSWORD:
@@ -243,13 +264,17 @@ def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
             except EOFError:
                 print("Connection to the IRC server is lost.", file=sys.stderr)
                 send_to_mc('tellraw', '@a', {
-                    'text': '[mcbot] IRC 서버와의 연결이 예기치 못하게 끊어졌습니다. 10초 후 다시 연결을 시도합니다.', 'color': 'red'
+                    'text': '[mcbot] IRC 서버와의 연결이 예기치 못하게 끊어졌습니다. '
+                            '10초 후 다시 연결을 시도합니다.',
+                    'color': 'red'
                 })
                 break
             if not line:
                 print("Connection to the IRC server is closed.", file=sys.stderr)
                 send_to_mc('tellraw', '@a', {
-                    'text': '[mcbot] IRC 서버와의 연결이 끊어졌습니다. 10초 후 다시 연결을 시도합니다.', 'color': 'red'
+                    'text': '[mcbot] IRC 서버와의 연결이 끊어졌습니다. '
+                            '10초 후 다시 연결을 시도합니다.',
+                    'color': 'red'
                 })
                 break
             line = line.rstrip().decode('utf8')
@@ -270,13 +295,13 @@ def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
                     #    yield from safeexec(None, getattr(botimpl, 'welcome', None), (message,))
                     elif command == 'privmsg' and len(param) > 0 and param[0].startswith('#') and param[0] == CHANNEL:
                         if ''.join(message.split()).lower() in ('%s,reload' % NICK, '%s:reload' % NICK):
-                            safeexec(param[0], imp.reload, (botimpl,))
-                            say(param[0], '재기동했습니다.')
-                            # A safe-guard for TICK & TIMEOUT values.
-                            if not isinstance(getattr(botimpl, 'TICK', None), int):
-                                botimpl.TICK = 10
-                            if not isinstance(getattr(botimpl, 'TIMEOUT', None), int):
-                                botimpl.TIMEOUT = 5
+                            def reload_safeguard():
+                                say(param[0], '재기동했습니다.')
+                                if not isinstance(getattr(botimpl, 'TICK', None), int):
+                                    botimpl.TICK = 10
+                                if not isinstance(getattr(botimpl, 'TIMEOUT', None), int):
+                                    botimpl.TIMEOUT = 5
+                            safeexec(param[0], imp.reload, (botimpl,), callback=reload_safeguard)
                         else:
                             safeexec(param[0], getattr(botimpl, 'msg', None), (param[0], prefix, message))
                     else:
@@ -292,6 +317,8 @@ def tick_coro():
 
 def main(args):
     loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, halt)
+    loop.add_signal_handler(signal.SIGTERM, halt)
 
     # Initialize zmq first.
     # This step is not a coroutine.
@@ -306,12 +333,9 @@ def main(args):
     asyncio.async(tick_coro())
 
     # Let it serve!
-    try:
-        loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
-        print('Exit.')
-    finally:
-        loop.close()
+    loop.run_forever()
+    print('Exit.')
+    loop.close()
 
 if __name__ == '__main__':
     sys.modules['bot'] = sys.modules['__main__']
@@ -352,9 +376,6 @@ if __name__ == '__main__':
     CHANNEL = args.channel
     MC_READ_SOCK, MC_WRITE_SOCK = args.readsock, args.writesock
     WORLDPATH = args.worldpath
-
-    signal.signal(signal.SIGINT, lambda sig, frame: halt())
-    signal.signal(signal.SIGTERM, lambda sig, frame: halt())
 
     print("Minecraft Bot starts!")
     main(args)

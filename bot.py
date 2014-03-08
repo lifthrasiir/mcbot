@@ -163,10 +163,11 @@ class AsyncZMQSocketReader:
     @asyncio.coroutine
     def recv(self, flags=0, copy=True, track=False):
         if flags & zmq.NOBLOCK:
-            return sock.recv(flags, copy, track)
+            # We don't have to do anything with intentionally nonblocking read.
+            return self._sock.recv(flags, copy, track)
         flags |= zmq.NOBLOCK
         try:
-            return zmq.Socket.recv(self._sock, flags, copy, track)
+            return self._sock.recv(flags, copy, track)
         except zmq.ZMQError as e:
             if e.errno != zmq.EAGAIN:
                 raise
@@ -185,6 +186,8 @@ class AsyncZMQSocketReader:
             if exc.errno != zmq.EAGAIN:
                 fut.set_exception(exc)
                 return
+            # Recursive callback until done.
+            # The OS will notify asyncio's event loop when the socket is ready to read.
             self._loop.add_reader(self._sockfd, self._recv, fut, True, *args)
         except Exception as exc:
             fut.set_exception(exc)

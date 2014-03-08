@@ -37,7 +37,7 @@ send_to_mc  = None  # initialized in mc_init
 send_to_irc = None  # initialized in irc_loop_coro
 
 def say(to, msg):
-    if callable(send_to_irc):
+    if send_to_irc is not None and callable(send_to_irc):
         send_to_irc('PRIVMSG %s :%s' % (to, msg))
     else:
         raise Exception('Unexpected timing to call send_to_irc()')
@@ -54,7 +54,6 @@ def halt(msg='그럼 이만!'):
     raise SystemExit
 
 def async_do(future, func, args, kwargs):
-    # A wrapper to convert plain Python functions into coroutine.
     try:
         ret = func(*args, **kwargs)
     except Exception as exc:
@@ -64,14 +63,17 @@ def async_do(future, func, args, kwargs):
         future.set_result(ret)
 
 def safeexec(to, f, args=(), kwargs=None):
-    #if f is None: return
-    #if kwargs is None: kwargs = {}
-    #return f(*args, **kwargs)
+    # TODO: This does not restrict the duration of execution as expected.
+    #       The primary reason is that coroutine-ignorant blocking cannot
+    #       be handled by the asyncio package.
+    # TODO: On *NIX systems we can use SIGARLAM as before.
+    #       But how to do the same thing with Windows?
     fut = asyncio.Future()
     if kwargs is None: kwargs = {}
-    async_do(fut, f, args, kwargs)
+    loop = asyncio.get_event_loop()
+    loop.call_soon(async_do, fut, f, args, kwargs)
     try:
-        return asyncio.async(asyncio.wait_for(fut, botimpl.TIMEOUT))
+        asyncio.async(asyncio.wait_for(fut, botimpl.TIMEOUT))
     except TimeoutError:
         raise
 
@@ -151,84 +153,6 @@ is_players = False
 #        return origexcepthook(ty, exc, tb)
 #    sys.excepthook = excepthook
 
-class IRCHandler(asyncio.Protocol):
-
-    def __init__(self, *args, **kwargs):
-        super(asyncio.Protocol, self).__init__(*args, **kwargs)
-        self.linebuf = b''
-
-    def send(self, line, silent=False):
-        msg = '%s\r\n' % line.replace('\r','').replace('\n','').replace('\0','')
-        self.transport.write(msg.encode('utf8'))
-        if not silent: print('>>', line)
- 
-    def connection_made(self, transport):
-        self.transport = transport
-        global send_to_irc
-        send_to_irc = functools.partial(IRCHandler.send, self)
-        if PASSWORD:
-            self.send('PASS {0}'.format(PASSWORD))
-        self.send('USER {0} {1} {2} :mcbot'.format(NICK, socket.gethostname(), socket.getfqdn()))
-        self.send('NICK {0}'.format(NICK))
-        send_to_mc('tellraw', '@a', {
-            'text': '[mcbot] IRC 서버에 연결하였습니다.', 'color': 'green'
-        })
-
-    def connection_lost(self, exc):
-        if exc is not None:
-            print("Connection to the IRC server is lost.", file=sys.stderr)
-            # The other side has closed the connection.
-            send_to_mc('tellraw', '@a', {
-                'text': '[mcbot] IRC 서버와의 연결이 끊어졌습니다. 다시 연결을 시도합니다.', 'color': 'red'
-            })
-            # TODO: reconnect
-
-    def eof_received(self):
-        # This is called when QUIT message is sent to the IRC server normally
-        # and the server closes our connection at its side.  We let the
-        # transport close itself.
-        return None
-
-    def data_received(self, data):
-        self.linebuf += data
-        while True:
-            pos = self.linebuf.find(b'\r\n')
-            if pos == -1:
-                break
-            line = self.linebuf[:pos]
-            line = line.rstrip().decode('utf8')
-            self.linebuf = self.linebuf[pos + 2:]  # Strip the line buffer
-            m = LINEPARSE.match(line)
-            if m:
-                prefix = m.group('prefix') or ''
-                command = m.group('command').lower()
-                param = (m.group('param') or '').split() or ['']
-                message = m.group('message') or ''
-                print('<<', line)
-                if command == 'ping':
-                    self.send('PONG :%s' % message, silent=True)
-                else:
-                    if command == '001':  # welcome
-                        self.send('JOIN %s' % CHANNEL)
-                    #elif command == 'invite' and len(param) > 0 and message:
-                    #    self.send('JOIN %s' % message)
-                    #    yield from safeexec(None, getattr(botimpl, 'welcome', None), (message,))
-                    elif command == 'privmsg' and len(param) > 0 and param[0].startswith('#') and param[0] == CHANNEL:
-                        if ''.join(message.split()).lower() in ('%s,reload' % NICK, '%s:reload' % NICK):
-                            safeexec(param[0], imp.reload, (botimpl,))
-                            # safeexec will return without blocking.
-                            # TODO: check if this behvaiour would be okay?
-                            say(param[0], '재기동했습니다.')
-                            # A safe-guard for TICK & TIMEOUT values.
-                            if not isinstance(getattr(botimpl, 'TICK', None), int):
-                                botimpl.TICK = 10
-                            if not isinstance(getattr(botimpl, 'TIMEOUT', None), int):
-                                botimpl.TIMEOUT = 5
-                        else:
-                            safeexec(param[0], getattr(botimpl, 'msg', None), (param[0], prefix, message))
-                    else:
-                        safeexec(None, getattr(botimpl, 'line', None), (command, prefix, param, message))
-
 class AsyncZMQSocketReader:
     # A minimal recv-only adapter of a ZMQ socket.
     # Ref: https://github.com/fafhrd91/pyzmqtulip/blob/master/zmqtulip/core.py
@@ -307,6 +231,71 @@ def mc_loop_coro(wrapped_stdin):
         safeexec(None, getattr(botimpl, 'handle', None), (line,))
 
 @asyncio.coroutine
+def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
+    while True:
+        irc_reader, irc_writer = yield from asyncio.open_connection(irc_host, irc_port, *args, **kwargs)
+        def _send_to_irc(line, silent=False):
+            msg = '%s\r\n' % line.replace('\r','').replace('\n','').replace('\0','')
+            irc_writer.write(msg.encode('utf8'))
+            if not silent: print('>>', line)
+        global send_to_irc
+        send_to_irc = _send_to_irc
+        if PASSWORD:
+            send_to_irc('PASS {0}'.format(PASSWORD))
+        send_to_irc('USER {0} {1} {2} :mcbot'.format(NICK, socket.gethostname(), socket.getfqdn()))
+        send_to_irc('NICK {0}'.format(NICK))
+        send_to_mc('tellraw', '@a', {
+            'text': '[mcbot] IRC 서버에 연결하였습니다.', 'color': 'green'
+        })
+        while True:
+            # TODO: check if the other side has closed the connection.
+            try:
+                line = yield from irc_reader.readline()
+            except EOFError:
+                print("Connection to the IRC server is lost.", file=sys.stderr)
+                send_to_mc('tellraw', '@a', {
+                    'text': '[mcbot] IRC 서버와의 연결이 예기치 못하게 끊어졌습니다. 10초 후 다시 연결을 시도합니다.', 'color': 'red'
+                })
+                break
+            if not line:
+                print("Connection to the IRC server is closed.", file=sys.stderr)
+                send_to_mc('tellraw', '@a', {
+                    'text': '[mcbot] IRC 서버와의 연결이 끊어졌습니다. 10초 후 다시 연결을 시도합니다.', 'color': 'red'
+                })
+                break
+            line = line.rstrip().decode('utf8')
+            m = LINEPARSE.match(line)
+            if m:
+                prefix = m.group('prefix') or ''
+                command = m.group('command').lower()
+                param = (m.group('param') or '').split() or ['']
+                message = m.group('message') or ''
+                if command == 'ping':
+                    send_to_irc('PONG :%s' % message, silent=True)
+                else:
+                    print('<<', line)
+                    if command == '001':  # welcome
+                        send_to_irc('JOIN %s' % CHANNEL)
+                    #elif command == 'invite' and len(param) > 0 and message:
+                    #    send_to_irc('JOIN %s' % message)
+                    #    yield from safeexec(None, getattr(botimpl, 'welcome', None), (message,))
+                    elif command == 'privmsg' and len(param) > 0 and param[0].startswith('#') and param[0] == CHANNEL:
+                        if ''.join(message.split()).lower() in ('%s,reload' % NICK, '%s:reload' % NICK):
+                            safeexec(param[0], imp.reload, (botimpl,))
+                            say(param[0], '재기동했습니다.')
+                            # A safe-guard for TICK & TIMEOUT values.
+                            if not isinstance(getattr(botimpl, 'TICK', None), int):
+                                botimpl.TICK = 10
+                            if not isinstance(getattr(botimpl, 'TIMEOUT', None), int):
+                                botimpl.TIMEOUT = 5
+                        else:
+                            safeexec(param[0], getattr(botimpl, 'msg', None), (param[0], prefix, message))
+                    else:
+                        safeexec(None, getattr(botimpl, 'line', None), (command, prefix, param, message))
+        # We restart the IRC connection from here.
+        yield from asyncio.sleep(10)
+
+@asyncio.coroutine
 def tick_coro():
     while True:
         yield from asyncio.sleep(botimpl.TICK)
@@ -316,19 +305,21 @@ def do_loop():
     loop = asyncio.get_event_loop()
 
     # Initialize zmq first.
+    # This step is not a coroutine.
     global send_to_mc
     send_to_mc, wrapped_stdin = mc_init(MC_READ_SOCK, MC_WRITE_SOCK)   
 
     # Schedule the coroutines.
+    ssl = False
     asyncio.async(mc_loop_coro(wrapped_stdin))
-    irc_loop_coro = loop.create_connection(IRCHandler, IRC_ADDR[0], IRC_ADDR[1])
-    asyncio.async(irc_loop_coro)
+    asyncio.async(irc_loop_coro(IRC_ADDR[0], IRC_ADDR[1],
+                                ssl=ssl, server_hostname=IRC_ADDR[0] if ssl else None))
     asyncio.async(tick_coro())
 
     # Let it serve!
     try:
         loop.run_forever()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         print('Exit.')
     finally:
         loop.close()

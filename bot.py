@@ -1,37 +1,26 @@
 #!/usr/env/bin python3.4
 # coding=utf-8
 
-from __future__ import print_function
 import sys
+import imp
 import re
 import functools
 import collections
+import argparse
 import asyncio
 import socket
 import json
-import time
 import signal
 import traceback
 import zmq
-import imp
-
-if len(sys.argv) < 9:
-    print('Usage: python %s <host> <port> <nick> <password> <channel> <readsock> <writesock> <worldpath>' % sys.argv[0], file=sys.stderr)
-    print('  First 4 arguments specify IRC connection; next 2 arguments specify 0proxy socket paths; the last specifies a path to MC world.')
-    print('  Example: irc.ozinger.org 6670 mybot mychannel ipc:///var/run/mcbot/read ipc:///var/run/mcbot/write /var/run/minecraft/world', file=sys.stderr)
-    raise SystemExit(1)
 
 LINEPARSE = re.compile("^(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)(?P<param>( +[^:][^ ]*)*)(?: +:(?P<message>.*))?$")
-
-IRC_ADDR = (sys.argv[1], sys.argv[2])
-NICK = str(sys.argv[3])
-PASSWORD = str(sys.argv[4])
-CHANNEL = str(sys.argv[5])
-MC_READ_SOCK, MC_WRITE_SOCK = sys.argv[6], sys.argv[7]
-WORLDPATH = sys.argv[8]
-
-signal.signal(signal.SIGINT, lambda sig, frame: halt())
-signal.signal(signal.SIGTERM, lambda sig, frame: halt())
+IRC_ADDR = None
+NICK     = None
+PASSWORD = None
+CHANNEL  = None
+MC_READ_SOCK, MC_WRITE_SOCK = None, None
+WORLDPATH = None
 
 send_to_mc  = None  # initialized in mc_init
 send_to_irc = None  # initialized in irc_loop_coro
@@ -301,7 +290,7 @@ def tick_coro():
         yield from asyncio.sleep(botimpl.TICK)
         safeexec(None, getattr(botimpl, 'idle', None))
 
-def do_loop():
+def main(args):
     loop = asyncio.get_event_loop()
 
     # Initialize zmq first.
@@ -310,7 +299,7 @@ def do_loop():
     send_to_mc, wrapped_stdin = mc_init(MC_READ_SOCK, MC_WRITE_SOCK)   
 
     # Schedule the coroutines.
-    ssl = False
+    ssl = args.use_ssl
     asyncio.async(mc_loop_coro(wrapped_stdin))
     asyncio.async(irc_loop_coro(IRC_ADDR[0], IRC_ADDR[1],
                                 ssl=ssl, server_hostname=IRC_ADDR[0] if ssl else None))
@@ -327,5 +316,45 @@ def do_loop():
 if __name__ == '__main__':
     sys.modules['bot'] = sys.modules['__main__']
     import botimpl  # requires certain APIs
+
+    argparser = argparse.ArgumentParser(
+        description='A Minecraft-IRC mediator bot with some user management features.',
+        epilog='Argument example: irc.ozinger.org 6670 mybot \'\' mychannel '
+               'ipc:///var/run/mcbot/read ipc:///var/run/mcbot/write /var/run/minecraft/world',
+    )
+    argparser.add_argument('host',
+                           help='set the IRC server\'s hostname.')
+    argparser.add_argument('port', type=int,
+                           help='set the IRC server\'s port number.')
+    argparser.add_argument('nick',
+                           help='set the IRC nickname to use.')
+    argparser.add_argument('password',
+                           help='set the IRC server password. If not required, '
+                                'set this as an empty string.')
+    argparser.add_argument('channel',
+                           help='set the IRC channel to join. Do not prefix  Only messages from this channel '
+                                'will be broadcasted to the Minecraft server.')
+    argparser.add_argument('readsock',
+                           help='set the 0proxy\'s read socket path. '
+                                '(e.g., ip:///var/run/mcbot/read.sock)')
+    argparser.add_argument('writesock',
+                           help='set the 0proxy\'s write socket path.')
+    argparser.add_argument('worldpath',
+                           help='specify the path to Minecraft world.')
+    argparser.add_argument('--ssl', dest='use_ssl', action='store_true', default=False,
+                           help='use SSL when connecting to the IRC server.')
+    args = argparser.parse_args()
+
+    # Legacy global variables; but some are necessary for reference from botimpl.py.
+    IRC_ADDR = (args.host, args.port)
+    NICK = args.nick
+    PASSWORD = args.password
+    CHANNEL = args.channel
+    MC_READ_SOCK, MC_WRITE_SOCK = args.readsock, args.writesock
+    WORLDPATH = args.worldpath
+
+    signal.signal(signal.SIGINT, lambda sig, frame: halt())
+    signal.signal(signal.SIGTERM, lambda sig, frame: halt())
+
     print("Minecraft Bot starts!")
-    do_loop()
+    main(args)

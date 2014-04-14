@@ -43,31 +43,39 @@ def halt(msg='그럼 이만!'):
     # NOTE: For Slack IRC gateway, this would not show any message due to
     #       "persistent" connection between the gateway and the Slack channel.
     #       Only de-voicing itself will be visible to the channel members.
-    irc_writer = send_to_irc('QUIT :%s' % msg, terminate=True);
+    irc_writer, drain = None, None
+    if send_to_irc is not None:
+        irc_writer = send_to_irc('QUIT :%s' % msg, terminate=True);
     loop = asyncio.get_event_loop()
     loop.stop()
     # Ensure the QUIT message is sent.
-    drain = irc_writer.drain()
+    if irc_writer: drain = irc_writer.drain()
     if drain: loop.run_until_complete(drain)
-    irc_writer.close()
+    if irc_writer: irc_writer.close()
     # Explicitly destory the ZMQ context since it may have separate threads.
     # For some reason(?), zmqctx.term() method does not work well...
     if zmqctx:
         zmqctx.destroy()
 
 def safeexec(to, f, args=(), kwargs=None, callback=None):
-    # TODO: This does not restrict the duration of execution as expected.
-    #       The primary reason is that coroutine-ignorant blocking cannot
-    #       be handled by the asyncio package.
-    # TODO: On *NIX systems we can use SIGARLAM as before.
-    #       But how to do the same thing with Windows?
     if kwargs is None: kwargs = {}
     try:
-        f(*args, **kwargs)
+        if asyncio.iscoroutinefunction(f):
+            @asyncio.coroutine
+            def safeexec_coro():
+                yield from asyncio.wait_for(asyncio.Task(f(*args, **kwargs)),
+                                            timeout=botimpl.TIMEOUT)
+                if callback:
+                    if asyncio.iscoroutinefunction(callback):
+                        yield from callback()
+                    else:
+                        callback()
+            asyncio.async(safeexec_coro())
+        else:
+            f(*args, **kwargs)
+            if callback: callback()
     except Exception:
         sayerr(to)
-    else:
-        if callback: callback()
 
 
 LIST_FLAG = False
@@ -271,6 +279,7 @@ def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
                             '10초 후 다시 연결을 시도합니다.',
                     'color': 'red'
                 })
+                send_to_irc = None
                 break
             if not line:
                 print("Connection to the IRC server is closed.", file=sys.stderr)
@@ -279,6 +288,7 @@ def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
                             '10초 후 다시 연결을 시도합니다.',
                     'color': 'red'
                 })
+                send_to_irc = None
                 break
             line = line.rstrip().decode('utf8')
             m = LINEPARSE.match(line)

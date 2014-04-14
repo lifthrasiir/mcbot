@@ -17,5 +17,5 @@ rss_watcher = None
 # 예제:
 # rss_watcher = {
 #   'url': 'http://bbs.mearie.org/mc/index.rss',
-#   'check_interval': 30,
+#   'check_interval': 3,
 # }

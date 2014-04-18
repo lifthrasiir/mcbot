@@ -1,16 +1,17 @@
+#! /usr/bin/env python3.4
 # coding=utf-8
 
-TICK = 30
+TICK = 20
 TIMEOUT = 20
 
 import sys
 import re
-import os
-import os.path
+import os, os.path
+import asyncio
 import time
 from datetime import datetime, timedelta
 import sqlite3
-import urllib.request
+import urllib.parse, urllib.request
 from xml.etree import cElementTree as ET
 from contextlib import contextmanager
 
@@ -69,13 +70,33 @@ STATUS_WHITELISTED = 1
 STATUS_KITRECEIVED = 2
 
 class RSSWatcher(object):
-    def __init__(self, url):
-        self.url = url
-        self.prevtitles = self.get_titles()
 
-    def get_titles(self):
-        tree = ET.fromstring(urllib.request.urlopen(self.url, timeout=1).read())
-        titles = {}
+    def __init__(self, url):
+        self.orig_url = url
+        self.url = urllib.parse.urlsplit(url)
+        self.prev_articles = None
+        self.is_updating = False
+
+    @asyncio.coroutine
+    def get_articles(self):
+        reader, writer = yield from asyncio.open_connection(self.url.hostname, 80)
+        query = 'GET {url.path} HTTP/1.0\r\n' \
+                'Host: {url.hostname}\r\n\r\n'.format(url=self.url)
+        writer.write(query.encode('latin1'))
+        response = yield from reader.read()
+        reader.feed_eof()
+        writer.close()
+        header, body = response.split(b'\r\n\r\n', 1)
+        header_lines = header.decode('utf8').split('\r\n')
+        proto, status, msg = header_lines[0].split(' ', 2)
+        assert proto.startswith('HTTP/1')
+        if status != '200':
+            raise RuntimeError('The URL {0} returned error: {1} {2}'.format(self.orig_url, status, msg))
+        headers = {k: v for k, v in (item.split(': ') for item in header_lines[1:])}
+        # TODO: replace above with aiohttp?
+        # TODO: use proper encoding from headers['Content-Type']
+        tree = ET.fromstring(body.decode('utf8'))
+        articles = {}
         for item in tree.findall('./channel/item'):
             title = item.find('title').text
             nreplies = None
@@ -85,21 +106,25 @@ class RSSWatcher(object):
                 nreplies = int(m.group(2))
             guid = item.find('guid').text
             link = item.find('link').text
-            titles[guid] = (link, title, nreplies)
-        return titles
+            articles[guid] = (link, title, nreplies)
+        return articles
 
+    @asyncio.coroutine
     def update(self):
-        titles = self.get_titles()
+        articles = yield from self.get_articles()
         added = []
         updated = []
-        for guid, (link, title, nreplies) in titles.items():
-            if guid not in self.prevtitles:
+        if self.prev_articles is None:
+            # return empty lists because this is an initial check-up.
+            return added, updated
+        for guid, (link, title, nreplies) in articles.items():
+            if guid not in self.prev_articles:
                 added.append((link, title, nreplies))
             else:
-                prevlink, prevtitle, prevnreplies = self.prevtitles[guid]
+                prevlink, prevtitle, prevnreplies = self.prev_articles[guid]
                 if nreplies != prevnreplies:
                     updated.append((link, title, (nreplies or 0) - (prevnreplies or 0)))
-        self.prevtitles = titles
+        self.prev_articles = articles
         return added, updated
 
 
@@ -109,9 +134,9 @@ def say(s):
 def mcsay(s):
     if s:
         if isinstance(s, dict):
-            bot.pipe.tellraw("@a", s)
+            bot.send_to_mc('tellraw', "@a", s)
         else:
-            bot.pipe.tellraw("@a", {"text": "", "extra": [{"text": s}]})
+            bot.send_to_mc('tellraw', "@a", {"text": "", "extra": [{"text": s}]})
 
 def escape_for_like(s, esc):
     return s.replace(esc, esc+esc).replace('_', esc+'_').replace('%', esc+'%')
@@ -174,7 +199,7 @@ def cmd(ismc, nick, cmd, args):
             reply('%s, 이 명령은 마인크래프트 안에서는 사용할 수 없습니다.' % nick)
         else:
             bot.is_players = True
-            bot.pipe.send('list')
+            bot.send_to_mc('list')
         return True
 
     if cmd == 'whois' or cmd == 'who' or cmd == 'w' or cmd == 'ㅈ':
@@ -243,28 +268,24 @@ def cmd(ismc, nick, cmd, args):
             elif u['status'] == STATUS_KITRECEIVED:
                 reply('%s, 이미 기본 아이템을 받았으면 다시 받을 수 없습니다. 필요하다면 관리자를 요청하세요.' % nick)
             else:
-                bot.pipe.give(u['mcid'], '256') # iron shovel
-                bot.pipe.give(u['mcid'], '257') # iron pickaxe
-                bot.pipe.give(u['mcid'], '258') # iron axe
-                bot.pipe.give(u['mcid'], '292') # iron hoe
-                bot.pipe.give(u['mcid'], '267') # iron sword
-                bot.pipe.give(u['mcid'], '50', '64') # 64x torch
-                bot.pipe.give(u['mcid'], '297', '64') # 64x bread
-                bot.pipe.give(u['mcid'], '328') # minecart
-                bot.pipe.give(u['mcid'], '355') # bed
+                bot.send_to_mc('give', u['mcid'], '256') # iron shovel
+                bot.send_to_mc('give', u['mcid'], '257') # iron pickaxe
+                bot.send_to_mc('give', u['mcid'], '258') # iron axe
+                bot.send_to_mc('give', u['mcid'], '292') # iron hoe
+                bot.send_to_mc('give', u['mcid'], '267') # iron sword
+                bot.send_to_mc('give', u['mcid'], '50', '64') # 64x torch
+                bot.send_to_mc('give', u['mcid'], '297', '64') # 64x bread
+                bot.send_to_mc('give', u['mcid'], '328') # minecart
+                bot.send_to_mc('give', u['mcid'], '355') # bed
                 with transaction():
                     DB.execute('update users set status=? where mcid=?;', (STATUS_KITRECEIVED, u['mcid']))
                 reply('%s, 기본 아이템을 보내 드렸습니다. 만약 이상이 있다면 관리자에게 요청해 주세요.' % nick)
         return True
 
 class BotHandler(bot.Handler):
-    def __init__(self, pipe):
-        self.pipe = pipe
+    def __init__(self):
         self.codec2 = hangul2.Codec_AchimHangul2()
         self.codec3 = hangul.Codec_Hangul3()
-
-    def __getattr__(self, name):
-        return getattr(self.pipe, name)
 
     def on_info(self, msg):
         print('[INFO]', msg)
@@ -300,7 +321,7 @@ class BotHandler(bot.Handler):
 
     def on_login(self, mcid, ip, entityid, coord):
         for msg in config.welcome_messages:
-            self.tellraw(mcid, msg)
+            bot.send_to_mc('tellraw', mcid, msg)
         say('*** %s님이 마인크래프트에 접속하셨습니다.' % (to_ircnick(mcid) or mcid))
         with transaction():
             DB.execute("update users set last_login=datetime('now') where mcid=?;", (mcid,))
@@ -345,7 +366,7 @@ class BotHandler(bot.Handler):
 
             # IRC와 (한글 변환이 이루어졌을 경우) 마인크래프트에 재출력
             if converted != text:
-                self.tellraw('@a', {'text': '', 'extra': [
+                bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
                     {'text': '<%s> ' % mcid, 'color': 'gold'},
                     {'text': converted}
                 ]})
@@ -374,46 +395,48 @@ if config.rss_watcher:
 else:
     RSS = None
 
-LAST_RSS = time.time()
+@asyncio.coroutine
 def update_rss_if_needed():
-    global RSS, LAST_RSS
+    global RSS
     if RSS is None:
-        return
-    now = time.time()
+        return None
+    if RSS.is_updating:
+        return None
+    RSS.is_updating = True
     interval = config.rss_watcher['check_interval']
-    if now - LAST_RSS < interval: return
-    try:
-        added, updated = RSS.update()
-    except Exception:
-        import traceback
-        traceback.print_exc()
-        LAST_RSS = now + (interval * 4) # 에러가 났을 경우 딜레이를 좀 더 길게 준다.
-        return
-    else:
-        LAST_RSS = now
+    while True:
+        try:
+            added, updated = yield from RSS.update()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            yield from asyncio.sleep(interval)
+            interval = min(300, interval * 4)
+        else:
+            break
+    RSS.is_updating = False
+    print('RSSWatcher: added {0} articles, updated {1} articles.'.format(len(added), len(updated)))
 
     def sayboth(msg, title, link):
         say('## %s: \002%s\002 @ %s' % (msg, title, link))
-        bot.pipe.say('\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
+        bot.send_to_mc('say', '\2472## %s: \247a%s\2472 @ %s' % (msg, title, link))
     for link, title, nreplies in added:
         sayboth('새 글이 올라왔습니다', title, link)
     for link, title, nnewreplies in updated:
         repliestext = '%d개의 ' % nnewreplies if nnewreplies > 1 else ''
         sayboth(repliestext + '새 답글이 올라왔습니다', title, link)
 
-def everytime():
-    update_rss_if_needed()
 
+@asyncio.coroutine
 def idle():
-    everytime()
+    # A timer function.
+    yield from update_rss_if_needed()
 
 def handle(line):
-    handler = BotHandler(bot.pipe)
+    handler = BotHandler()
     result = handler.on_line(line)
     if result is None:
         print('*** unhandled: %s' % line)
-
-    everytime()
 
 def msg(channel, source, msg):
     wascmd = False
@@ -425,26 +448,22 @@ def msg(channel, source, msg):
     if not wascmd:
         nick = getnick(source)
         if nick and '\001' not in msg: # no CTCP yet
-            bot.pipe.tellraw('@a', {'text': '', 'extra': [
+            bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
                 {'text': '[IRC] ', 'color': 'gold'},
                 {'text': '<%s> %s' % (nick, msg.replace('\247', '')), 'color': 'white'}
             ]})
 
-    everytime()
-
 def line(command, source, param, message):
     if command == 'join':
         nick = getnick(source)
-        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+        if nick: bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
             {'text': '[IRC] %s님이 입장하셨습니다.' % nick, 'color': 'gold'}
         ]})
     elif command == 'part':
         nick = getnick(source)
-        if nick: bot.pipe.tellraw('@a', {'text': '', 'extra': [
+        if nick: bot.send_to_mc('tellraw', '@a', {'text': '', 'extra': [
             {'text': '[IRC] %s님이 나가셨습니다.' % nick, 'color': 'gold'}
         ]})
-
-    everytime()
 
 def welcome(channel):
     pass

@@ -263,7 +263,7 @@ def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
         send_to_irc = _send_to_irc
         if PASSWORD:
             send_to_irc('PASS {0}'.format(PASSWORD))
-        send_to_irc('USER {0} {1} {2} :mcbot'.format(NICK, socket.gethostname(), socket.getfqdn()))
+        send_to_irc('USER mcbot {0} {1} :mcbot'.format(socket.gethostname(), socket.getfqdn()))
         send_to_irc('NICK {0}'.format(NICK))
         send_to_mc('tellraw', '@a', {
             'text': '[mcbot] IRC 서버에 연결하였습니다.', 'color': 'green'

@@ -290,7 +290,7 @@ def irc_loop_coro(irc_host, irc_port, *args, **kwargs):
                 })
                 send_to_irc = None
                 break
-            line = line.rstrip().decode('utf8')
+            line = line.rstrip().decode('utf8', 'replace')
             m = LINEPARSE.match(line)
             if m:
                 prefix = m.group('prefix') or ''

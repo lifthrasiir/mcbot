@@ -36,7 +36,7 @@ deathmsg = {
     '^was was shot by (.+)$': '님이 %s님이 쏜 화살에 맞아 사망하셨습니다.',
     '^was killed by (.+)$': '님이 %s님이 던진 포션에 맞아 사망하셨습니다.',
     '^was killed by magic$': '님이 마법에 의해 사망하셨습니다.',
-    '^starved to death$': '님이 굶어 죽으셨습니다..',
+    '^starved to death$': '님이 굶어 죽으셨습니다.',
     '^suffocated in a wall$': '님이 9와 3/4 승강장에 가려다 벽에 껴 질식사 하셨습니다.',
     '^was killed while trying to hurt (.+)$': '님이 %s에게 피해를 입히려다 방법당하셨습니다.',
     '^fell out of the world$': '님이 세상 밖으로 떨어지셨습니다.',

@@ -19,6 +19,7 @@ How to run (for Ubuntu/Upstart)
  - pyzmq (use `easy_install`; `pip` does not work currently)
 1. Compile 0proxy.c by `$ gcc 0proxy.c -o 0proxy -lzmq`.
 1. Copy `mcbot_defconfig.py` to `mcbot_config.py` and modify it as you want. (e.g., login welcome messages and RSS tracker)
+1. Create directory `db` with `mkdir db`
 1. Create the following upstart configurations, with modification specific to your environments applied.  The configurations may be either session jobs (upstart 1.7 or higher required) or system jobs.  Please refer the Upstart Cookbook to see [what a session job is](http://upstart.ubuntu.com/cookbook/#session-job) and [how to configure session jobs on a non-GUI environment](http://upstart.ubuntu.com/cookbook/#non-graphical-sessions-ubuntu-specific).
 
 **~/.init/minecraft.conf**
@@ -31,7 +32,7 @@ stop on runlevel [!2345]
 # modify paths according to your environment
 chdir /home/{USERDIR}/minecraft
 env MCPATH=/home/{USERDIR}/minecraft
-env ZMQ=/home/{USERDIR}/minecraft/bin/0proxy  # the path where the 0proxy executable is lcoated.
+env ZMQ=/home/{USERDIR}/minecraft/0proxy  # the path where the 0proxy executable is lcoated.
 console log
 
 pre-start script
@@ -92,7 +93,7 @@ pre-start script
 end script
 
 # Use "python" instead of "python3" if you use the master branch
-exec python3 bot.py {IRCSERVER-HOSTNAME} {IRCSERVER-PORT} {IRCNICK} "#{IRCCHANNEL}" ipc\:///home/{USERDIR}/minecraft/mc_server.stdout.sock ipc\:///home/{USERDIR}/minecraft/mc_server.stdin.sock /home/{USERDIR}/minecraft/{WORLDNAME}
+exec python3 bot.py {IRCSERVER-HOSTNAME} {IRCSERVER-PORT} {IRCNICK} {IRCSERVER-PASSWORD} "#{IRCCHANNEL}" ipc\:///home/{USERDIR}/minecraft/mc_server.stdout.sock ipc\:///home/{USERDIR}/minecraft/mc_server.stdin.sock /home/{USERDIR}/minecraft/{WORLDNAME}
 ```
 
 You may add external scripts (e.g., overviewer updates registered as a cron job) like:

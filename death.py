@@ -54,4 +54,4 @@ def msg_i18n(why):
         m = key.search(why)
         if m:
             return deathmsg_re[key] % m.groups()
-    return False
+    return why
